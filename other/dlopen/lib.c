@@ -16,3 +16,7 @@ void _init(void){
 void __attribute__((constructor)) _test_init(void){
     printf("hello world\n");
 }
+
+void __attribute__((destructor)) _test_destory(void){
+    printf("destory\n");
+}
