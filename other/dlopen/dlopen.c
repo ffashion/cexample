@@ -1,7 +1,6 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <stdio.h>
-extern void _init(void);
 int main(int argc, char const *argv[])
 {   
     void *handle;
