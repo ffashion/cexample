@@ -1,4 +1,1 @@
-all:
-	gcc -g get_ip_bydomain.c -o get_ip_bydomain
-clean:
-	rm -rf get_ip_bydomain
+hostprogs-always-y += get_ip_bydoamin

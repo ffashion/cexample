@@ -1,2 +1,1 @@
-all:
-	gcc option.c -o option
+hostprogs-always-y += option
