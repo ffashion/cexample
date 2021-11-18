@@ -15,10 +15,10 @@ int main(int argc, char const *argv[])
     char *md = NULL;
     char o[100] = {0};
 
-    HMAC(EVP_md5(),"password",7,"hello world",10,NULL,&md_len);
+    HMAC(EVP_md5(),"password",8,"hello world",11,NULL,&md_len);
     md =  malloc((size_t)md_len);
 
-    HMAC(EVP_md5(),"password",7,"hello world",10,md,&md_len);
+    HMAC(EVP_md5(),"password",8,"hello world",11,md,&md_len);
 
     hexToString(md,o,md_len);
 
