@@ -13,6 +13,11 @@
 #include <unistd.h>
 #include <openssl/hmac.h>
 
+#define __noreturn __attribute__((__noreturn__))
+
+#define ARRAY_SIZE(arr) \
+    (sizeof(arr) / sizeof((arr)[0]))
+
 #define ROUND_UP(val, div) ({   \
     (((val) - 1) / (div) + 1);  \
 })
@@ -59,7 +64,6 @@ struct md_type md_types[] = {
     {"blake2b512", EVP_blake2b512},
     {"blake2s256", EVP_blake2s256},
 #endif
-    { }, /* NULL */
 };
 
 #if TEST_MODE
@@ -151,6 +155,22 @@ free_seed:
     return -ENOMEM;
 }
 
+static __noreturn void usage(void)
+{
+    unsigned int index;
+
+    fprintf(stderr, "usage: rmdir [-lk] ...\n");
+    fprintf(stderr, "  -l  output length\n");
+    fprintf(stderr, "  -k  key\n");
+    fprintf(stderr, "  -t  message digest\n");
+
+    fprintf(stderr, "supported message digest:\n");
+    for (index = 0; index < ARRAY_SIZE(md_types); ++index)
+        printf("  %s\n", md_types[index].name);
+
+    exit(1);
+}
+
 static int htoa(uint8_t *hex, char *str, unsigned int len, bool output)
 {
     unsigned int count;
@@ -173,22 +193,13 @@ static int htoa(uint8_t *hex, char *str, unsigned int len, bool output)
 
 static struct md_type *get_type(const char *name)
 {
-    struct md_type *type;
+    unsigned int index;
 
-    for (type = md_types; type->name; ++type)
-        if (!strcmp(type->name, name))
-            return type;
+    for (index = 0; index < ARRAY_SIZE(md_types); ++index)
+        if (!strcasecmp(md_types[index].name, name))
+            return &md_types[index];
 
-    return md_types;
-}
-
-static void usage(void)
-{
-    fprintf(stderr, "usage: rmdir [-lk] ...\n");
-    fprintf(stderr, "  -l  output length\n");
-    fprintf(stderr, "  -k  key\n");
-    fprintf(stderr, "  -t  message digest\n");
-    exit(1);
+    usage();
 }
 
 int main(int argc, char *const *argv)
