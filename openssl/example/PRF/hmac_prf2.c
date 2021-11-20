@@ -184,8 +184,8 @@ static void usage(void)
 {
     fprintf(stderr, "usage: rmdir [-lk] ...\n");
     fprintf(stderr, "  -l  output length\n");
-    fprintf(stderr, "  -k  prf key\n");
-    fprintf(stderr, "  -t  prf type\n");
+    fprintf(stderr, "  -k  key\n");
+    fprintf(stderr, "  -t  message digest\n");
     exit(1);
 }
 
