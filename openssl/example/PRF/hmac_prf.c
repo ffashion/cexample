@@ -159,7 +159,7 @@ static __noreturn void usage(void)
 {
     unsigned int index;
 
-    fprintf(stderr, "usage: rmdir [-lkt] ...\n");
+    fprintf(stderr, "Usage: [-lkt] ...\n");
     fprintf(stderr, "  -l  output length\n");
     fprintf(stderr, "  -k  key\n");
     fprintf(stderr, "  -t  message digest\n");
