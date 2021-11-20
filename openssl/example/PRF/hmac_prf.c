@@ -34,7 +34,7 @@ void hexToString(unsigned char *hex, char *str, int len, int output) {
 
 uint32_t phash(const EVP_MD *op, unsigned char *secret, int secret_len,
                char *seed, uint32_t seed_len, char *prf, uint32_t olen) {
-  int hash_size = 16;
+  int hash_size = EVP_MD_size(op);
   char *p = NULL, A1[A_CRYPTO_MAX_MD_LEN];
   uint32_t ret;
 
@@ -73,17 +73,17 @@ int compute_prf2() {
   set_seed(seed);
   seed_size = strlen(seed);
   char *prf = malloc(1024);
-  phash(EVP_md5(), "password", 8, seed, seed_size, prf, 1024);
+  phash(EVP_sha1(), "password", 8, seed, seed_size, prf, 1024);
   hexToString(prf, NULL, 1024, 1);
 }
 
 
-int compute_prf(int wanted_output_size) {
+int compute_prf(const EVP_MD *hash,int wanted_output_size) {
   char *seed = NULL;
   char *prf = NULL;
   char *current_prf = NULL;
   int seed_size = 0;
-  int hash_size = 16;
+  int hash_size = EVP_MD_size(hash);
   
 
   seed = malloc(strlen(helloworld) * 10);
@@ -105,11 +105,11 @@ int compute_prf(int wanted_output_size) {
   previous_md_size = seed_size;
   for (int i = 0; i < round_up(wanted_output_size, hash_size); i++) {
     int prf_once_size = 0;
-    HMAC(EVP_md5(), "password", 8, previous_md, previous_md_size, current_md,
+    HMAC(hash, "password", 8, previous_md, previous_md_size, current_md,
          &current_md_size);
 
     memcpy(current_md + current_md_size, seed, seed_size);
-    HMAC(EVP_md5(), "password", 8, current_md, hash_size + seed_size,
+    HMAC(EVP_sha1(), "password", 8, current_md, hash_size + seed_size,
          current_prf,
          &prf_once_size);  // current_prf = HMAC(sec,HMAC(sec,seed))
     current_prf += prf_once_size;
@@ -129,7 +129,7 @@ int compute_prf(int wanted_output_size) {
 }
 
 int main(int argc, char const *argv[]) { 
-    compute_prf(2);
+    compute_prf(EVP_sha1(),1024);
     compute_prf2();
 
 }
