@@ -17,9 +17,49 @@
     (((val) - 1) / (div) + 1);  \
 })
 
-#define HASH_SIZE 16
 #define SEED_SIZE 110
 #define TEST_MODE 1
+
+struct evp_type {
+    const char *name;
+    const EVP_MD *(*fun)(void);
+};
+
+struct evp_type evp_types[] = {
+    {"sha1", EVP_sha1},
+    {"sha224", EVP_sha224},
+    {"sha256", EVP_sha256},
+    {"sha384", EVP_sha384},
+    {"sha512", EVP_sha512},
+    {"sha512_224", EVP_sha512_224},
+    {"sha512_256", EVP_sha512_256},
+    {"sha3_224", EVP_sha3_224},
+    {"sha3_256", EVP_sha3_256},
+    {"sha3_384", EVP_sha3_384},
+    {"sha3_512", EVP_sha3_512},
+    {"shake128", EVP_shake128},
+    {"shake256", EVP_shake256},
+    {"mdc2", EVP_mdc2},
+    {"ripemd160", EVP_ripemd160},
+    {"whirlpool", EVP_whirlpool},
+    {"sm3", EVP_sm3},
+    {"md_null", EVP_md_null},
+#ifndef OPENSSL_NO_MD2
+    {"md2", EVP_md2},
+#endif
+#ifndef OPENSSL_NO_MD4
+    {"md4", EVP_md4},
+#endif
+#ifndef OPENSSL_NO_MD5
+    {"md5", EVP_md5},
+    {"md5_sha1", EVP_md5_sha1},
+#endif
+#ifndef OPENSSL_NO_BLAKE2
+    {"blake2b512", EVP_blake2b512},
+    {"blake2s256", EVP_blake2s256},
+#endif
+    { }, /* NULL */
+};
 
 #if TEST_MODE
 static void *get_random(unsigned long size)
@@ -39,63 +79,60 @@ static void *get_random(unsigned long size)
 #else
 static void *get_random(unsigned long size)
 {
-    int ramdom, ret;
-    void *block;
+    int fd, ret;
+    void *random;
 
-    block = malloc(size);
-    if (!block)
+    random = malloc(size);
+    if (!random)
         return NULL;
 
-    ramdom = open("/dev/random", O_RDONLY);
-    if (ramdom < 0)
+    fd = open("/dev/random", O_RDONLY);
+    if (fd < 0)
         goto error_free;
 
-    ret = read(ramdom, block, size);
+    ret = read(fd, random, size);
     if (ret < 0)
         goto error_close;
 
-    close(ramdom);
-    return block;
+    close(fd);
+    return random;
 
 error_close:
-    close(ramdom);
+    close(fd);
 error_free:
-    free(block);
+    free(random);
 
     return NULL;
 }
 #endif
 
-int compute_prf(unsigned int out_size, uint8_t **pout)
+static int compute_prf(const EVP_MD *evp, uint8_t **pout, unsigned int size, char *key)
 {
-    unsigned int count, curr_size = SEED_SIZE;
+    unsigned int klen, count, once, curr_size = SEED_SIZE;
+    unsigned int hsize = EVP_MD_size(evp);
     uint8_t *buff, *prf, *seed;
-
-    if (!out_size || !pout)
-        return -EINVAL;
 
     seed = get_random(SEED_SIZE);
     if (!seed)
         return -ENOMEM;
 
-    buff = malloc(HASH_SIZE + SEED_SIZE);
+    buff = malloc(hsize + SEED_SIZE);
     if (!buff)
         goto free_seed;
 
-    *pout = prf = malloc(out_size + HASH_SIZE);
+    *pout = prf = malloc(size + hsize);
     if (!prf)
         goto free_buff;
 
+    klen = strlen(key);
     memcpy(buff, seed, SEED_SIZE);
 
-    for (count = 0; count < ROUND_UP(out_size, HASH_SIZE); ++count) {
-        unsigned int once_size;
-
-        HMAC(EVP_md5(), "password", 8, buff, curr_size, buff, &curr_size);
+    for (count = 0; count < ROUND_UP(size, hsize); ++count) {
+        HMAC(evp, key, klen, buff, curr_size, buff, &curr_size);
         memcpy(buff + curr_size, seed, SEED_SIZE);
 
-        HMAC(EVP_md5(), "password", 8, buff, HASH_SIZE + SEED_SIZE, prf, &once_size);
-        prf += once_size;
+        HMAC(evp, key, klen, buff, hsize + SEED_SIZE, prf, &once);
+        prf += once;
     }
 
     free(buff);
@@ -106,6 +143,7 @@ free_buff:
     free(buff);
 free_seed:
     free(seed);
+
     return -ENOMEM;
 }
 
@@ -129,17 +167,54 @@ static int htoa(uint8_t *hex, char *str, unsigned int len, bool output)
     return 0;
 }
 
-int main(int argc, const char *argv[])
+static struct evp_type *get_type(const char *name)
 {
-    uint8_t *data;
-    int len, ret = 0;
+    struct evp_type *type;
 
-    len = atoi(argv[1]);
-    if ((ret = compute_prf(len, &data)))
+    for (type = evp_types; type->name; ++type)
+        if (!strcmp(type->name, name))
+            return type;
+
+    return NULL;
+}
+
+static void usage(void)
+{
+    fprintf(stderr, "usage: rmdir [-lk] ...\n");
+    fprintf(stderr, "  -l  output length\n");
+    fprintf(stderr, "  -k  prf key\n");
+    fprintf(stderr, "  -t  prf type\n");
+    exit(1);
+}
+
+int main(int argc, char *const *argv)
+{
+    struct evp_type *type = evp_types;
+    char arg, *key = "password";
+    int ret, len = 1024;
+    uint8_t *prf;
+
+    while ((arg = getopt(argc, argv, "l:k:t:")) != -1) {
+        switch (arg) {
+            case 'l':
+                len = atoi(optarg);
+                break;
+            case 'k':
+                key = optarg;
+                break;
+            case 't':
+                type = get_type(optarg);
+                break;
+            default:
+                usage();
+        }
+    }
+
+    if ((ret = compute_prf(type->fun(), &prf, len, key)))
         return ret;
 
-    ret = htoa(data, NULL, len, 1);
+    ret = htoa(prf, NULL, len, 1);
 
-    free(data);
+    free(prf);
     return ret;
 }
