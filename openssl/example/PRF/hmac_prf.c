@@ -1,135 +1,237 @@
-#include <openssl/hmac.h>
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ * Copyright(c) 2021 Sanpe <sanpeqf@gmail.com>
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <errno.h>
 #include <string.h>
-#define A_CRYPTO_MAX_MD_LEN 64
-char helloworld[] = "hello world";
+#include <err.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <openssl/hmac.h>
 
-void set_seed(char *seed) {
-  for (int i = 0; i < 10; i++) {
-    strcpy(seed + i * 11, helloworld);
-  }
-  return;
+#define __noreturn __attribute__((__noreturn__))
+
+#define ARRAY_SIZE(arr) \
+    (sizeof(arr) / sizeof((arr)[0]))
+
+#define ROUND_UP(val, div) ({   \
+    (((val) - 1) / (div) + 1);  \
+})
+
+#define SEED_SIZE 110
+#define TEST_MODE 1
+
+struct md_type {
+    const char *name;
+    const EVP_MD *(*fun)(void);
+};
+
+struct md_type md_types[] = {
+    {"sha1", EVP_sha1},
+    {"sha224", EVP_sha224},
+    {"sha256", EVP_sha256},
+    {"sha384", EVP_sha384},
+    {"sha512", EVP_sha512},
+    {"sha512_224", EVP_sha512_224},
+    {"sha512_256", EVP_sha512_256},
+    {"sha3_224", EVP_sha3_224},
+    {"sha3_256", EVP_sha3_256},
+    {"sha3_384", EVP_sha3_384},
+    {"sha3_512", EVP_sha3_512},
+    {"shake128", EVP_shake128},
+    {"shake256", EVP_shake256},
+#ifndef OPENSSL_NO_MDC2
+    {"mdc2", EVP_mdc2},
+#endif
+    {"ripemd160", EVP_ripemd160},
+    {"whirlpool", EVP_whirlpool},
+    {"sm3", EVP_sm3},
+#ifndef OPENSSL_NO_MD2
+    {"md2", EVP_md2},
+#endif
+#ifndef OPENSSL_NO_MD4
+    {"md4", EVP_md4},
+#endif
+#ifndef OPENSSL_NO_MD5
+    {"md5", EVP_md5},
+    {"md5_sha1", EVP_md5_sha1},
+#endif
+#ifndef OPENSSL_NO_BLAKE2
+    {"blake2b512", EVP_blake2b512},
+    {"blake2s256", EVP_blake2s256},
+#endif
+};
+
+#if TEST_MODE
+static void *get_random(unsigned long size)
+{
+    char *block, seed[] = "hello world";
+    unsigned int count;
+
+    block = malloc(ROUND_UP(size, sizeof(seed)) * sizeof(seed));
+    if (!block)
+        return NULL;
+
+    for (count = 0; count < ROUND_UP(size, sizeof(seed)); ++count)
+        strcpy(block + count * 11, seed);
+
+    return block;
 }
+#else
+static void *get_random(unsigned long size)
+{
+    int fd, ret;
+    void *random;
 
-int round_up(int x, int y) {
-    // return x % y == 0 ? x /y : x /y + 1;
-    // return (x + y - 1)  / y;
-    return (x - 1 )/ y + 1;
+    random = malloc(size);
+    if (!random)
+        return NULL;
+
+    fd = open("/dev/random", O_RDONLY);
+    if (fd < 0)
+        goto error_free;
+
+    ret = read(fd, random, size);
+    if (ret < 0)
+        goto error_close;
+
+    close(fd);
+    return random;
+
+error_close:
+    close(fd);
+error_free:
+    free(random);
+
+    return NULL;
 }
+#endif
 
-void hexToString(unsigned char *hex, char *str, int len, int output) {
-  if (str == NULL) {
-    str = malloc(2 * len) ;
-  }
-  for (size_t i = 0; i < len; i++) {
-    sprintf(str + i * 2, "%02x", hex[i]);
-  }
-  if (output) {
-    printf("%s\n", str);
-  }
-  free(str);
-  return;
-}
+static int compute_prf(const EVP_MD *md, uint8_t **pout, unsigned int size, char *key)
+{
+    unsigned int klen, count, once, curr_size = SEED_SIZE;
+    unsigned int hsize = EVP_MD_size(md);
+    uint8_t *buff, *prf, *seed;
 
-uint32_t phash(const EVP_MD *op, unsigned char *secret, int secret_len,
-               char *seed, uint32_t seed_len, char *prf, uint32_t olen) {
-  int hash_size = EVP_MD_size(op);
-  char *p = NULL, A1[A_CRYPTO_MAX_MD_LEN];
-  uint32_t ret;
+    if (!md || !pout || !size || !key)
+        return -EINVAL;
 
-  p = malloc(seed_len + hash_size);
+    seed = get_random(SEED_SIZE);
+    if (!seed)
+        return -ENOMEM;
 
-  HMAC(op, secret, secret_len, seed, seed_len, A1, NULL);
+    buff = malloc(hsize + SEED_SIZE);
+    if (!buff)
+        goto free_seed;
 
-  for (;;) {
-    memcpy(p, A1, hash_size);
-    memcpy(p + hash_size, seed, seed_len);
+    *pout = prf = malloc(size + hsize);
+    if (!prf)
+        goto free_buff;
 
-    if (olen > hash_size) {
-      HMAC(op, secret, secret_len, p, seed_len + hash_size, prf,
-           NULL);  //  prf = HMAC(sec,HMAC(sec,seed),seed)
+    klen = strnlen(key, ~0U);
+    memcpy(buff, seed, SEED_SIZE);
 
-      prf += hash_size;
-      olen -= hash_size;
+    for (count = 0; count < ROUND_UP(size, hsize); ++count) {
+        HMAC(md, key, klen, buff, curr_size, buff, &curr_size);
+        memcpy(buff + curr_size, seed, SEED_SIZE);
 
-      HMAC(op, secret, secret_len, A1, hash_size, A1, NULL);
-
-    } else {  //最后一次 不够长度的HMAC
-      HMAC(op, secret, secret_len, p, seed_len + hash_size, A1, NULL);
-
-      memcpy(prf, A1, olen);
-      break;
+        HMAC(md, key, klen, buff, hsize + SEED_SIZE, prf, &once);
+        prf += once;
     }
-  }
 
-  free(p);
+    free(buff);
+    free(seed);
+    return 0;
+
+free_buff:
+    free(buff);
+free_seed:
+    free(seed);
+
+    return -ENOMEM;
 }
 
-int compute_prf2() {
-  char *seed = NULL;
-  int seed_size = 0;
-  seed = malloc(strlen(helloworld) * 10);
-  set_seed(seed);
-  seed_size = strlen(seed);
-  char *prf = malloc(1024);
-  phash(EVP_sha1(), "password", 8, seed, seed_size, prf, 1024);
-  hexToString(prf, NULL, 1024, 1);
+static __noreturn void usage(void)
+{
+    unsigned int index;
+
+    fprintf(stderr, "usage: rmdir [-lkt] ...\n");
+    fprintf(stderr, "  -l  output length\n");
+    fprintf(stderr, "  -k  key\n");
+    fprintf(stderr, "  -t  message digest\n");
+
+    fprintf(stderr, "supported message digest:\n");
+    for (index = 0; index < ARRAY_SIZE(md_types); ++index)
+        printf("  %s\n", md_types[index].name);
+
+    exit(1);
 }
 
+static int htoa(uint8_t *hex, char *str, unsigned int len, bool output)
+{
+    unsigned int count;
+    bool state;
 
-int compute_prf(const EVP_MD *hash,int wanted_output_size) {
-  char *seed = NULL;
-  char *prf = NULL;
-  char *current_prf = NULL;
-  int seed_size = 0;
-  int hash_size = EVP_MD_size(hash);
-  
+    if ((state = !str) && !(str = malloc(2 * len)))
+        return -ENOMEM;
 
-  seed = malloc(strlen(helloworld) * 10);
+    for (count = 0; count < len; ++count)
+        sprintf(str + count * 2, "%02x", hex[count]);
 
-  prf = malloc(wanted_output_size + hash_size);
+    if (output)
+        printf("%s\n", str);
 
-  set_seed(seed);
-  seed_size = strlen(seed);
+    if (state)
+        free(str);
 
-  char *previous_md = malloc(hash_size + seed_size);
-  int previous_md_size = 0;
-
-  char *current_md = malloc(hash_size + seed_size);
-  int current_md_size = 0;
-
-  current_prf = prf;
-
-  strcpy(previous_md, seed);
-  previous_md_size = seed_size;
-  for (int i = 0; i < round_up(wanted_output_size, hash_size); i++) {
-    int prf_once_size = 0;
-    HMAC(hash, "password", 8, previous_md, previous_md_size, current_md,
-         &current_md_size);
-
-    memcpy(current_md + current_md_size, seed, seed_size);
-    HMAC(EVP_sha1(), "password", 8, current_md, hash_size + seed_size,
-         current_prf,
-         &prf_once_size);  // current_prf = HMAC(sec,HMAC(sec,seed))
-    current_prf += prf_once_size;
-
-    //为下一个循环准备
-    memcpy(previous_md, current_md, current_md_size);
-    previous_md_size = current_md_size;
-  }
-
-  hexToString(prf, NULL, wanted_output_size, 1);
-
-  free(seed);
-  free(prf);
-  free(previous_md);
-  free(current_md);
-  return 0;
+    return 0;
 }
 
-int main(int argc, char const *argv[]) { 
-    compute_prf(EVP_sha1(),1024);
-    compute_prf2();
+static struct md_type *get_type(const char *name)
+{
+    unsigned int index;
 
+    for (index = 0; index < ARRAY_SIZE(md_types); ++index)
+        if (!strcasecmp(md_types[index].name, name))
+            return &md_types[index];
+
+    return md_types;
+}
+
+int main(int argc, char *const *argv)
+{
+    struct md_type *type = md_types;
+    char arg, *key = "password";
+    int ret, len = 1024;
+    uint8_t *prf;
+
+    while ((arg = getopt(argc, argv, "l:k:t:h-")) != -1) {
+        switch (arg) {
+            case 'l':
+                len = atoi(optarg);
+                break;
+            case 'k':
+                key = optarg;
+                break;
+            case 't':
+                type = get_type(optarg);
+                break;
+            default:
+                usage();
+        }
+    }
+
+    printf("%s:%d:\"%s\"\n", type->name, len, key);
+
+    if ((ret = compute_prf(type->fun(), &prf, len, key)))
+        return ret;
+
+    ret = htoa(prf, NULL, len, 1);
+
+    free(prf);
+    return ret;
 }
