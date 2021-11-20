@@ -20,12 +20,12 @@
 #define SEED_SIZE 110
 #define TEST_MODE 1
 
-struct evp_type {
+struct md_type {
     const char *name;
     const EVP_MD *(*fun)(void);
 };
 
-struct evp_type evp_types[] = {
+struct md_type md_types[] = {
     {"sha1", EVP_sha1},
     {"sha224", EVP_sha224},
     {"sha256", EVP_sha256},
@@ -39,7 +39,9 @@ struct evp_type evp_types[] = {
     {"sha3_512", EVP_sha3_512},
     {"shake128", EVP_shake128},
     {"shake256", EVP_shake256},
+#ifndef OPENSSL_NO_MDC2
     {"mdc2", EVP_mdc2},
+#endif
     {"ripemd160", EVP_ripemd160},
     {"whirlpool", EVP_whirlpool},
     {"sm3", EVP_sm3},
@@ -167,11 +169,11 @@ static int htoa(uint8_t *hex, char *str, unsigned int len, bool output)
     return 0;
 }
 
-static struct evp_type *get_type(const char *name)
+static struct md_type *get_type(const char *name)
 {
-    struct evp_type *type;
+    struct md_type *type;
 
-    for (type = evp_types; type->name; ++type)
+    for (type = md_types; type->name; ++type)
         if (!strcmp(type->name, name))
             return type;
 
@@ -189,7 +191,7 @@ static void usage(void)
 
 int main(int argc, char *const *argv)
 {
-    struct evp_type *type = evp_types;
+    struct md_type *type = md_types;
     char arg, *key = "password";
     int ret, len = 1024;
     uint8_t *prf;

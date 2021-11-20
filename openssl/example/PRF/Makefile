@@ -3,4 +3,4 @@ all:
 	gcc -g hmac_prf2.c -o hmac_prf2 -lcrypto -Wall -Werror
 	gcc -g hash_prf.c -o hash_prf -lcrypto
 clean:
-	rm -rf hmac_prf  hmac_prf2 hash_prf
+	rm -rf hmac_prf hmac_prf2 hash_prf
