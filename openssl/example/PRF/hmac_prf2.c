@@ -45,7 +45,6 @@ struct md_type md_types[] = {
     {"ripemd160", EVP_ripemd160},
     {"whirlpool", EVP_whirlpool},
     {"sm3", EVP_sm3},
-    {"md_null", EVP_md_null},
 #ifndef OPENSSL_NO_MD2
     {"md2", EVP_md2},
 #endif
@@ -108,11 +107,14 @@ error_free:
 }
 #endif
 
-static int compute_prf(const EVP_MD *evp, uint8_t **pout, unsigned int size, char *key)
+static int compute_prf(const EVP_MD *md, uint8_t **pout, unsigned int size, char *key)
 {
     unsigned int klen, count, once, curr_size = SEED_SIZE;
-    unsigned int hsize = EVP_MD_size(evp);
+    unsigned int hsize = EVP_MD_size(md);
     uint8_t *buff, *prf, *seed;
+
+    if (!md || !pout || !size || !key)
+        return -EINVAL;
 
     seed = get_random(SEED_SIZE);
     if (!seed)
@@ -126,14 +128,14 @@ static int compute_prf(const EVP_MD *evp, uint8_t **pout, unsigned int size, cha
     if (!prf)
         goto free_buff;
 
-    klen = strlen(key);
+    klen = strnlen(key, ~0U);
     memcpy(buff, seed, SEED_SIZE);
 
     for (count = 0; count < ROUND_UP(size, hsize); ++count) {
-        HMAC(evp, key, klen, buff, curr_size, buff, &curr_size);
+        HMAC(md, key, klen, buff, curr_size, buff, &curr_size);
         memcpy(buff + curr_size, seed, SEED_SIZE);
 
-        HMAC(evp, key, klen, buff, hsize + SEED_SIZE, prf, &once);
+        HMAC(md, key, klen, buff, hsize + SEED_SIZE, prf, &once);
         prf += once;
     }
 
@@ -177,7 +179,7 @@ static struct md_type *get_type(const char *name)
         if (!strcmp(type->name, name))
             return type;
 
-    return NULL;
+    return md_types;
 }
 
 static void usage(void)
