@@ -209,7 +209,7 @@ int main(int argc, char *const *argv)
     int ret, len = 1024;
     uint8_t *prf;
 
-    while ((arg = getopt(argc, argv, "l:k:t:")) != -1) {
+    while ((arg = getopt(argc, argv, "l:k:t:h:-:")) != -1) {
         switch (arg) {
             case 'l':
                 len = atoi(optarg);
@@ -224,6 +224,8 @@ int main(int argc, char *const *argv)
                 usage();
         }
     }
+
+    printf("%s:%d:\"%s\"\n", type->name, len, key);
 
     if ((ret = compute_prf(type->fun(), &prf, len, key)))
         return ret;
