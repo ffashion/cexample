@@ -159,7 +159,7 @@ static __noreturn void usage(void)
 {
     unsigned int index;
 
-    fprintf(stderr, "usage: rmdir [-lk] ...\n");
+    fprintf(stderr, "usage: rmdir [-lkt] ...\n");
     fprintf(stderr, "  -l  output length\n");
     fprintf(stderr, "  -k  key\n");
     fprintf(stderr, "  -t  message digest\n");
@@ -199,7 +199,7 @@ static struct md_type *get_type(const char *name)
         if (!strcasecmp(md_types[index].name, name))
             return &md_types[index];
 
-    usage();
+    return md_types;
 }
 
 int main(int argc, char *const *argv)
@@ -209,7 +209,7 @@ int main(int argc, char *const *argv)
     int ret, len = 1024;
     uint8_t *prf;
 
-    while ((arg = getopt(argc, argv, "l:k:t:h:-:")) != -1) {
+    while ((arg = getopt(argc, argv, "l:k:t:h-")) != -1) {
         switch (arg) {
             case 'l':
                 len = atoi(optarg);
