@@ -111,20 +111,17 @@ error_free:
 }
 #endif
 
-static int compute_prf(const EVP_MD *md, uint8_t **pout, unsigned int size, char *key)
+static int compute_prf(const EVP_MD *evp_md, uint8_t **pout, unsigned int size, char *key, char *seed)
 {
-    unsigned int klen, count, once, curr_size = SEED_SIZE;
-    unsigned int hsize = EVP_MD_size(md);
-    uint8_t *buff, *prf, *seed;
+    unsigned int ksize, count, ssize, buff_size;
+    unsigned int hsize = EVP_MD_size(evp_md);
+    uint8_t *buff, *prf;
 
-    if (!md || !pout || !size || !key)
+    if (!evp_md || !pout || !size || !key || !seed)
         return -EINVAL;
 
-    seed = get_random(SEED_SIZE);
-    if (!seed)
-        return -ENOMEM;
-
-    buff = malloc(hsize + SEED_SIZE);
+    ssize = strnlen(seed, ~0U);
+    buff = malloc(hsize + ssize);
     if (!buff)
         goto free_seed;
 
@@ -132,15 +129,16 @@ static int compute_prf(const EVP_MD *md, uint8_t **pout, unsigned int size, char
     if (!prf)
         goto free_buff;
 
-    klen = strnlen(key, ~0U);
-    memcpy(buff, seed, SEED_SIZE);
+    ksize = strnlen(key, ~0U);
+    memcpy(buff, seed, ssize);
+    buff_size = ssize;
 
     for (count = 0; count < ROUND_UP(size, hsize); ++count) {
-        HMAC(md, key, klen, buff, curr_size, buff, &curr_size);
-        memcpy(buff + curr_size, seed, SEED_SIZE);
+        HMAC(evp_md, key, ksize, buff, buff_size, buff, &buff_size);
+        memcpy(buff + hsize, seed, ssize);
 
-        HMAC(md, key, klen, buff, hsize + SEED_SIZE, prf, &once);
-        prf += once;
+        HMAC(evp_md, key, ksize, buff, hsize + ssize, prf, NULL);
+        prf += hsize;
     }
 
     free(buff);
@@ -159,10 +157,11 @@ static __noreturn void usage(void)
 {
     unsigned int index;
 
-    fprintf(stderr, "Usage: hmac_prf [-lkt] ...\n");
+    fprintf(stderr, "Usage: hmac_prf [-lkts] ...\n");
     fprintf(stderr, "  -l  output length\n");
     fprintf(stderr, "  -k  key\n");
     fprintf(stderr, "  -t  message digest\n");
+    fprintf(stderr, "  -s  seed\n");
 
     fprintf(stderr, "supported message digest:\n");
     for (index = 0; index < ARRAY_SIZE(md_types); ++index)
@@ -205,11 +204,11 @@ static struct md_type *get_type(const char *name)
 int main(int argc, char *const *argv)
 {
     struct md_type *type = md_types;
-    char arg, *key = "password";
+    char arg, *key = "password",*seed = get_random(110);
     int ret, len = 1024;
     uint8_t *prf;
 
-    while ((arg = getopt(argc, argv, "l:k:t:h-")) != -1) {
+    while ((arg = getopt(argc, argv, "l:k:t:s:h-")) != -1) {
         switch (arg) {
             case 'l':
                 len = atoi(optarg);
@@ -220,14 +219,19 @@ int main(int argc, char *const *argv)
             case 't':
                 type = get_type(optarg);
                 break;
+            case 's':
+                if(seed)
+                  free(seed);
+                seed = strdup(optarg);
+                break;
             default:
                 usage();
         }
     }
 
-    printf("%s:%d:\"%s\"\n", type->name, len, key);
+    printf("%s:%d:\"%s\":\"%s\"\n", type->name, len, key, seed);
 
-    if ((ret = compute_prf(type->fun(), &prf, len, key)))
+    if ((ret = compute_prf(type->fun(), &prf, len, key, seed)))
         return ret;
 
     ret = htoa(prf, NULL, len, 1);
