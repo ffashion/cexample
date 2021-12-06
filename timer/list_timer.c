@@ -3,7 +3,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
-
+#include <pthread.h>
 typedef void* (*timer_cb)(void *);
 
 typedef struct list_node_timer { 
@@ -15,9 +15,13 @@ typedef struct list_node_timer {
 
 typedef struct list {
     list_node_timer_t *first;
+    pthread_mutex_t mutex;
 }list_t;
 
-
+int list_timer_init(list_t *list) {
+    list->first = NULL;
+    pthread_mutex_init(&list->mutex, NULL);
+} 
 int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
     list_node_timer_t *node;
     list_node_timer_t *new;
@@ -36,7 +40,7 @@ int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
     new->next = NULL;
     new->time = time;
     new->cb = cb;
-    //比某个节点小 插入到他的前面
+    //比某个节点小 插入到他的前面 相同的时间 会插入到之前的那个后面
     for (; node ;) {
         if (time < node->time) {
             if (node = list->first) {
@@ -45,8 +49,15 @@ int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
                 return 0;
             }else {
                 //由于使用单链表 不能获得前一个节点
+                
+                //换回调
+                new->cb = node->cb; 
+                node->cb = cb;
+                //换时间
                 new->time = node->time; //新的节点换成node->time
                 node->time = time; //老的节点换成time
+
+
                 list_node_timer_t *tmp;
                 tmp = node->next;
                 node->next = new;
@@ -98,20 +109,33 @@ void *test_cb(void * argc) {
     static int i = 0;
     printf("this is test_cb %d\n",i++);
 }
-int main(int argc, char const *argv[])
-{
+
+
+void *add_timer_handler(void *argc) {
     int rc = 0;
-    list_t list;
-    list.first = NULL;
+    list_t *list = argc;
+    for(;;) {
 
-    rc = list_timer_insert(&list, time(NULL) + 1, test_cb);
-    rc = list_timer_insert(&list, time(NULL) + 2, test_cb);
-    rc = list_timer_insert(&list, time(NULL) + 3, test_cb);
-    rc = list_timer_insert(&list, time(NULL) + 4, test_cb);
+        pthread_mutex_lock(&list->mutex);
+        printf("insert node->time %ld\n", time(NULL) + 1);
+        rc =  list_timer_insert(list, time(NULL) + 1, test_cb);
 
-    list_traveverse(&list);
-    while(1) {
-        list_node_timer_t *node = list_timer_find_latest(&list);
+        pthread_mutex_unlock(&list->mutex);
+        
+        usleep(1000 * 1000 / 2); //0.5s 
+    }
+
+}
+
+void *read_timer_handler(void *argc) {
+    int rc = 0;
+    list_t *list = argc;
+
+    for(;;) {
+        //这步 实际上是删除。
+        pthread_mutex_lock(&list->mutex);
+        list_node_timer_t *node = list_timer_find_latest(list);
+        pthread_mutex_unlock(&list->mutex);
         if (node) {
             printf("find node->time: %ld\n", node->time);
             if (node->cb) {
@@ -120,5 +144,38 @@ int main(int argc, char const *argv[])
             free(node);
         }
     }
+
+}
+
+
+int main(int argc, char const *argv[])
+{
+    int rc = 0;
+    list_t list;
+
+    list_timer_init(&list);
+
+    pthread_t add_timer_handler_tid1;
+    pthread_t add_timer_handler_tid2;
+    
+    pthread_t read_timer_handler_tid1;
+    pthread_t read_timer_handler_tid2;
+
+
+    //别看 开了4个线程 实际上 就是单线程的性能
+    rc = pthread_create(&add_timer_handler_tid1, NULL, add_timer_handler, &list);
+
+    rc = pthread_create(&add_timer_handler_tid2, NULL, add_timer_handler, &list);
+
+    rc = pthread_create(&read_timer_handler_tid1, NULL, read_timer_handler, &list);
+
+    rc = pthread_create(&read_timer_handler_tid2, NULL, read_timer_handler, &list);
+
+    // list_traveverse(&list);
+
+
+    
+    for(;;);
+   
     return 0;
 }
