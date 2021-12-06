@@ -3,9 +3,13 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+typedef void* (*timer_cb)(void *);
+
 typedef struct list_node_timer { 
     struct list_node_timer *next;
     time_t time;
+    timer_cb cb;
 }list_node_timer_t;
 
 
@@ -14,7 +18,7 @@ typedef struct list {
 }list_t;
 
 
-int list_timer_insert(list_t *list, time_t time) {
+int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
     list_node_timer_t *node;
     list_node_timer_t *new;
     if (list == NULL)
@@ -24,13 +28,14 @@ int list_timer_insert(list_t *list, time_t time) {
         node = list->first;
         node->next = NULL;
         node->time = time;
+        node->cb = cb;
         return 0;
     }
     node = list->first;
     new =  malloc(sizeof(list_node_timer_t));
     new->next = NULL;
     new->time = time;
-
+    new->cb = cb;
     //比某个节点小 插入到他的前面
     for (; node ;) {
         if (time < node->time) {
@@ -60,22 +65,19 @@ int list_timer_insert(list_t *list, time_t time) {
 }
 
 
-time_t list_timer_find_latest(list_t *list) {
+list_node_timer_t *list_timer_find_latest(list_t *list) {
     list_node_timer_t *node;
-    time_t ret;
     if (list == NULL || list->first == NULL) 
-        return -1;
+        return NULL;
     
     //只寻找首节点
     node = list->first;
     //没有任何定时器到时
     if (node->time > time(NULL))
-        return -1;
+        return NULL;
     else {
         list->first = node->next;
-        ret = node->time;
-        free(node);
-        return ret;
+        return node;
     }
         
 }
@@ -92,23 +94,31 @@ int list_traveverse(list_t *list) {
     return 1;
 }
 
+void *test_cb(void * argc) {
+    static int i = 0;
+    printf("this is test_cb %d\n",i++);
+}
 int main(int argc, char const *argv[])
 {
     int rc = 0;
     list_t list;
     list.first = NULL;
 
-    rc = list_timer_insert(&list, time(NULL) + 1);
-    rc = list_timer_insert(&list, time(NULL) + 2);
-    rc = list_timer_insert(&list, time(NULL) + 3);
-    rc = list_timer_insert(&list, time(NULL) + 4);
+    rc = list_timer_insert(&list, time(NULL) + 1, test_cb);
+    rc = list_timer_insert(&list, time(NULL) + 2, test_cb);
+    rc = list_timer_insert(&list, time(NULL) + 3, test_cb);
+    rc = list_timer_insert(&list, time(NULL) + 4, test_cb);
 
     list_traveverse(&list);
-
     while(1) {
-        time_t latest_time = list_timer_find_latest(&list);
-        if (latest_time != -1)
-            printf("find timer %ld\n",latest_time);
+        list_node_timer_t *node = list_timer_find_latest(&list);
+        if (node) {
+            printf("find node->time: %ld\n", node->time);
+            if (node->cb) {
+                node->cb(NULL);
+            }
+            free(node);
+        }
     }
     return 0;
 }
