@@ -11,7 +11,7 @@
 
 struct server_epoll_data {
     int  fd;
-    char ip[32];
+    char ip[sizeof("255.255.255.255")];
 };
 
 typedef  struct server_in_cidr {
@@ -27,7 +27,7 @@ typedef struct server_cidr {
  * @brief 
  * 
  * @param addr 
- * @param addr2 如果addr 为NULL 使用这个地址
+ * @param addr2 如果addr 为NULL 使用这个地址 主机序 地址
  * @param port 
  * @return int  -1 erro 0 correct
  */
@@ -93,13 +93,75 @@ int server_epoll_free_fd(int ep, int fd) {
 
 }
 
+int ptocidr(const char *text, server_cidr_t *cidr) {
+    char *addr, *mask;
+    int addr_len, shift;
+
+    
+    mask = strchr(text, '/');
+
+    if (mask == NULL) 
+        return -1;
+
+    addr_len = mask - text;
+
+    addr = malloc(addr_len +1);
+    if (!addr) 
+        return -1;
+    
+    (void)memcpy(addr, text, addr_len);
+    addr[addr_len] = '\0';
+    cidr->in.addr =  inet_addr(addr);
+    free(addr);
+
+    mask++;
+    shift = atoi(mask);
+    if(shift == -1) 
+        return -1;
+
+
+    if (shift > 32) 
+        return -1;
+    if (shift) {
+        cidr->in.mask =  htonl((uint32_t) (0xffffffffu << (32 - shift)));
+    }else {
+        //shift is zero 
+        cidr->in.mask = 0;
+    }
+
+    if (cidr->in.addr == (cidr->in.addr & cidr->in.mask)) 
+        return 0;
+    
+    cidr->in.addr &= cidr->in.mask;
+    
+    
+    return 1;
+}
+
+void hexToString(unsigned char *hex, char *str, int len, int output) {
+  if (str == NULL) {
+    str = malloc(2 * len) ;
+  }
+  for (size_t i = 0; i < len; i++) {
+    sprintf(str + i * 2, "%02x", hex[i]);
+  }
+  if (output) {
+    printf("%s\n", str);
+  }
+  free(str);
+  return;
+}
+
 int main(int argc, char const *argv[]){
     char c ;
     int ep, epoll_num, tris = 7, port;
+    uint32_t subnet_range;
     struct epoll_event events[255];
     struct server_epoll_data epoll_datas[255];
     struct server_epoll_data *epoll_data;
-    char ip_mask[sizeof("255.255.255.255/32")];
+    server_cidr_t cidr;
+    uint32_t host_ip;
+    uint32_t host_mask;
 
     //ip/mask port
     if (argc <= 2) {
@@ -107,7 +169,14 @@ int main(int argc, char const *argv[]){
         exit(-1);
     }
 
-    strcpy(ip_mask,argv[1]);
+    int rc = ptocidr(argv[1], &cidr);
+
+    if (rc == -1) {
+        return -1;
+    }
+
+    host_ip = ntohl(cidr.in.addr);
+    host_mask = ntohl(cidr.in.mask);
 
 
     port = atoi(argv[2]);
@@ -119,53 +188,45 @@ int main(int argc, char const *argv[]){
         return -1;
     }
     
+    
+    subnet_range = (host_mask ^ 0xffffffffu) -1;
+    // hexToString((unsigned char *)&host_ip, NULL, 4, 1);
+    // hexToString((unsigned char *)&host_mask, NULL, 4, 1);
 
+    // // hexToString((unsigned char *)&subnet_range, NULL, 4, 1);
 
-    // char addr[] = "nc -z -w 1 10.10.22.000 22";
-    char addr[] = "10.10.22.000";
+    // printf("subnet_range :%d\n",subnet_range);
+    
 
-    for (int i =1 ; i <= 254 ; i++) {
+    if (subnet_range <= 0) {
+        printf("ip or mask set error\n");
+        return -1;
+    }
         
-        
-        if (i < 10) {
-            addr[9] = i + '0';
-            addr[10] = ' ';
-            addr[11] = ' ';
-        }
- 
-        if (i >= 10) {
-            addr[9] = i % 100 /10 + '0';
-            addr[10] = i % 10 + '0';
-            addr[11] = ' ';
-        }
-        if (i >= 100) {
-            addr[9] = (i % 1000 /100) + '0';
-            addr[10] = (i % 100 /10) + '0';
-            addr[11] = (i % 10) + '0';
-        }
-
-        // epoll_datas->ip = addr;
-        
-
+    
+    for (int i =1 ; i <= subnet_range; i++) {
         int fd = -1;
-        fd = connect2server(addr, -1, port);
-        
-
+       
+        fd = connect2server(NULL, host_ip + i, port);
         if (fd == -1) {
+            perror("");
             return -1;
         }
+        struct in_addr in_addr;
+        in_addr.s_addr = (in_addr_t)htonl(host_ip + i);
 
-        strcpy(epoll_datas[i].ip, addr);
+        strcpy(epoll_datas[i].ip, inet_ntoa(in_addr));
         
         // printf("try %s\n",epoll_datas[i].ip);
 
         if (server_epoll_add_fd(ep, fd, &epoll_datas[i]) == -1) {
             return -1;
         }
+
     }
 
-    for (; tris; tris--) {
-        epoll_num =  epoll_wait(ep, events, sizeof(events)/sizeof(events[0]), 5000); //延时200毫秒
+     for (; tris; tris--) {
+        epoll_num =  epoll_wait(ep, events, sizeof(events)/sizeof(events[0]), 5000); //延时5000毫秒
         // printf("epoll num :%d\n",epoll_num);
         if (epoll_num == 0) {
             return 0;
@@ -176,6 +237,62 @@ int main(int argc, char const *argv[]){
         } 
 
     }
+
+    // // char addr[] = "nc -z -w 1 10.10.22.000 22";
+    // // char addr[] = "10.10.22.000";
+
+    // for (int i =1 ; i <= 254 ; i++) {
+        
+        
+    //     if (i < 10) {
+    //         addr[9] = i + '0';
+    //         addr[10] = ' ';
+    //         addr[11] = ' ';
+    //     }
+ 
+    //     if (i >= 10) {
+    //         addr[9] = i % 100 /10 + '0';
+    //         addr[10] = i % 10 + '0';
+    //         addr[11] = ' ';
+    //     }
+    //     if (i >= 100) {
+    //         addr[9] = (i % 1000 /100) + '0';
+    //         addr[10] = (i % 100 /10) + '0';
+    //         addr[11] = (i % 10) + '0';
+    //     }
+
+    //     // epoll_datas->ip = addr;
+        
+
+    //     int fd = -1;
+    //     fd = connect2server(addr, -1, port);
+        
+
+    //     if (fd == -1) {
+    //         return -1;
+    //     }
+
+    //     strcpy(epoll_datas[i].ip, addr);
+        
+    //     // printf("try %s\n",epoll_datas[i].ip);
+
+    //     if (server_epoll_add_fd(ep, fd, &epoll_datas[i]) == -1) {
+    //         return -1;
+    //     }
+    // }
+
+    // for (; tris; tris--) {
+    //     epoll_num =  epoll_wait(ep, events, sizeof(events)/sizeof(events[0]), 5000); //延时5000毫秒
+    //     // printf("epoll num :%d\n",epoll_num);
+    //     if (epoll_num == 0) {
+    //         return 0;
+    //     }
+    //     for (int i=0 ; i <= epoll_num-1 ;i++) {
+    //         epoll_data = events[i].data.ptr;
+    //         printf("%s\n", epoll_data->ip);
+    //     } 
+
+    // }
 
     return 0;
 }
