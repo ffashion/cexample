@@ -11,7 +11,7 @@
 
 struct server_epoll_data {
     int  fd;
-    char ip[sizeof("255.255.255.255")];
+    char ip[sizeof("255.255.255.255:65535")];
 };
 
 typedef  struct server_in_cidr {
@@ -33,6 +33,7 @@ typedef struct server_cidr {
  */
 
 int connect2server(char *addr, uint32_t addr2, int port){
+    int reuseport = 1 , reuseaddr = 1, rc;
     if(port <= 0){
         return -1;
     }
@@ -56,6 +57,13 @@ int connect2server(char *addr, uint32_t addr2, int port){
     flags = fcntl(client_fd, F_GETFL, 0);
 
     fcntl(client_fd, F_SETFL, O_NONBLOCK | flags);
+
+    rc = setsockopt(client_fd, SOL_SOCKET, SO_REUSEPORT, &reuseport, sizeof(reuseport));
+    if (rc == -1) 
+        return -1;
+    rc = setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+    if (rc == -1) 
+        return -1;
 
     if(connect(client_fd,(struct sockaddr *)&client,sizeof(client)) == -1){
         if (errno == EINPROGRESS) {
@@ -137,7 +145,27 @@ int ptocidr(const char *text, server_cidr_t *cidr) {
     
     return 1;
 }
-
+int get_port_range(const char *text, int *port1, int *port2) {
+    const char *_port1, *_port2;
+    _port1 = text;
+    _port2 = strchr(text, ',');
+    
+    if (_port2 == NULL) {
+        *port1 = atoi(_port1);
+        *port2 = *port1;
+        if(port1 <= 0) {
+            return -1;
+        }
+    }else {
+        _port2++;
+        *port1 = atoi(_port1);
+        *port2 = atoi(_port2);
+        if (*port1<=0 || *port2 <=0 || *port2 < *port1) {
+            return -1;
+        }
+    }
+    return 0;
+}
 void hexToString(unsigned char *hex, char *str, int len, int output) {
   if (str == NULL) {
     str = malloc(2 * len) ;
@@ -154,18 +182,17 @@ void hexToString(unsigned char *hex, char *str, int len, int output) {
 
 int main(int argc, char const *argv[]){
     char c ;
-    int ep, epoll_num, tris = 7, port;
-    uint32_t subnet_range;
-    struct epoll_event events[255];
-    struct server_epoll_data epoll_datas[255];
+    int ep, epoll_num, tris = 7, port_min, port_max;
+    struct epoll_event events[10000];
+    struct server_epoll_data epoll_datas[10000];
     struct server_epoll_data *epoll_data;
     server_cidr_t cidr;
-    uint32_t host_ip;
-    uint32_t host_mask;
+    uint32_t host_ip, host_mask, host_port, subnet_range;
+    int fd[10000] = {0}, fd_index = 0 , i;
 
     //ip/mask port
     if (argc <= 2) {
-        printf("usage ./probe_network [ip/mask] [port]\n");
+        printf("usage ./probe_network [ip/mask] [port1 [,port2]]\n");
         exit(-1);
     }
 
@@ -179,7 +206,12 @@ int main(int argc, char const *argv[]){
     host_mask = ntohl(cidr.in.mask);
 
 
-    port = atoi(argv[2]);
+    // port = atoi(argv[2]);
+    rc = get_port_range(argv[2], &port_min, &port_max);
+    if (rc == -1) {
+        printf("port set error\n");
+        return -1;
+    }
 
 
     ep = server_epoll_create();
@@ -197,46 +229,61 @@ int main(int argc, char const *argv[]){
 
     // printf("subnet_range :%d\n",subnet_range);
     
-
     if (subnet_range <= 0) {
         printf("ip or mask set error\n");
         return -1;
     }
         
     
-    for (int i =1 ; i <= subnet_range; i++) {
-        int fd = -1;
-       
-        fd = connect2server(NULL, host_ip + i, port);
-        if (fd == -1) {
-            perror("");
-            return -1;
-        }
-        struct in_addr in_addr;
-        in_addr.s_addr = (in_addr_t)htonl(host_ip + i);
-
-        strcpy(epoll_datas[i].ip, inet_ntoa(in_addr));
+    for (i = 1 ; i <= subnet_range; i++) {
         
-        // printf("try %s\n",epoll_datas[i].ip);
+        for (host_port = port_min; host_port <= port_max ; host_port++) {
+            fd_index ++;
+            fd[fd_index] = connect2server(NULL, host_ip + i, host_port);
+            if (fd[fd_index] == -1) {
+                perror("");
+                goto error_close_fd;
+            }
 
-        if (server_epoll_add_fd(ep, fd, &epoll_datas[i]) == -1) {
-            return -1;
+            struct in_addr in_addr;
+            in_addr.s_addr = (in_addr_t)htonl(host_ip + i);
+
+            strcpy(epoll_datas[i].ip, inet_ntoa(in_addr));
+
+            sprintf(epoll_datas[i].ip + strlen(inet_ntoa(in_addr)) , ":%d", host_port);
+            
+
+            // printf("try %s\n",epoll_datas[i].ip);
+
+            if (server_epoll_add_fd(ep, fd[fd_index], &epoll_datas[i]) == -1)
+                return -1;
+            
         }
 
     }
 
-     for (; tris; tris--) {
+    for (; tris; tris--) {
         epoll_num =  epoll_wait(ep, events, sizeof(events)/sizeof(events[0]), 5000); //延时5000毫秒
         // printf("epoll num :%d\n",epoll_num);
         if (epoll_num == 0) {
-            return 0;
+            break;
         }
         for (int i=0 ; i <= epoll_num-1 ;i++) {
             epoll_data = events[i].data.ptr;
             printf("%s\n", epoll_data->ip);
-        } 
+        }
 
     }
 
+    // printf("close %d\n",fd_index);
+    for(i = 1; i <= fd_index; i++) {
+        close(fd[i]);
+    }
     return 0;
+error_close_fd:
+    // printf("close %d\n",fd_index-1);
+    for(i = 1; i <= fd_index -1; i++) {
+        close(fd[i]);
+    }
+    return -1;
 }
