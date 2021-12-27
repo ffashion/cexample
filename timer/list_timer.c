@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdint.h>
 typedef void* (*timer_cb)(void *);
 
 typedef struct list_node_timer { 
@@ -18,14 +22,32 @@ typedef struct list {
     pthread_mutex_t mutex;
 }list_t;
 
+int true_random() {
+    int random_num, fd, nread;
+
+    fd = open("/dev/random", O_RDONLY);
+    if (fd < -1) 
+        return -1;
+    nread = read(fd , &random_num, sizeof(random_num));
+    if (nread < 0) 
+        return -1;
+    close(fd);
+    
+    if (random_num < 0)
+        random_num = -random_num;
+    return random_num;
+}
+
 int random_usleep(int range_ms) {
     int sleep_time;
-    srand(time(NULL));
-    sleep_time =  rand() % range_ms;
-    
+    sleep_time = true_random() % range_ms;
+
     usleep(sleep_time);
     return  0;;
 }
+
+
+
 
 int list_timer_init(list_t *list) {
     list->first = NULL;
@@ -128,16 +150,27 @@ void *add_timer_handler(void *argc) {
     for(;;) {
 
         pthread_mutex_lock(&list->mutex);
-        printf("insert node->time %ld\n", time(NULL) + 1);
-        rc =  list_timer_insert(list, time(NULL) + 1, test_cb);
+        printf("current time : %ld, insert node->time %ld\n", time(NULL), time(NULL) + true_random() % 10);
+        rc =  list_timer_insert(list, time(NULL) + true_random() % 10, test_cb);
 
         pthread_mutex_unlock(&list->mutex);
         
-        random_usleep(1000 * 1000); //1s
+        random_usleep(1000 * 1000 *2); //1s
     }
 
 }
+/*
 
+ "r")
+            echo -e "\033[31m $2\033[0m"
+            ;;
+        "g")
+            echo -e "\033[32m $2\033[0m"
+            ;;
+        "bl")
+            echo -e "\033[36m $2\033[0m"
+
+*/
 void *read_timer_handler(void *argc) {
     int rc = 0;
     list_t *list = argc;
@@ -148,16 +181,16 @@ void *read_timer_handler(void *argc) {
         list_node_timer_t *node = list_timer_find_latest(list);
         pthread_mutex_unlock(&list->mutex);
         if (node) {
-            printf("find node->time: %ld\n", node->time);
+            printf("\033[32mcurrrent time %ld, find node->time: %ld\033[0m\n", time(NULL) , node->time);
             if (node->cb) {
                 node->cb(NULL);
             }
             free(node);
         }else {
-            printf("timer list is null\n");
+            printf("\033[31mtimer list is null \033[0m \n");
         }
         
-        random_usleep(1000 * 1000 ); //1s
+        random_usleep(1000 * 1000 * 2); //1s
     }
 
 }
