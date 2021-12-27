@@ -18,6 +18,15 @@ typedef struct list {
     pthread_mutex_t mutex;
 }list_t;
 
+int random_usleep(int range_ms) {
+    int sleep_time;
+    srand(time(NULL));
+    sleep_time =  rand() % range_ms;
+    
+    usleep(sleep_time);
+    return  0;;
+}
+
 int list_timer_init(list_t *list) {
     list->first = NULL;
     pthread_mutex_init(&list->mutex, NULL);
@@ -41,14 +50,15 @@ int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
     new->time = time;
     new->cb = cb;
     //比某个节点小 插入到他的前面 相同的时间 会插入到之前的那个后面
+    //时间从低到高排列
     for (; node ;) {
-        if (time < node->time) {
-            if (node = list->first) {
+        if (new->time < node->time) {
+            if (node == list->first) {
                 list->first = new;
                 new->next = node;
                 return 0;
             }else {
-                //由于使用单链表 不能获得前一个节点
+                //由于使用单链表 不能获得前一个节点 使用交换的方法
                 
                 //换回调
                 new->cb = node->cb; 
@@ -68,6 +78,7 @@ int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
         if (node->next) 
             node = node->next;
         else {
+            // printf("t\n");
             node->next = new;
             return 0;
         }
@@ -122,7 +133,7 @@ void *add_timer_handler(void *argc) {
 
         pthread_mutex_unlock(&list->mutex);
         
-        usleep(1000 * 1000 / 2); //0.5s 
+        random_usleep(1000 * 1000); //1s
     }
 
 }
@@ -142,7 +153,11 @@ void *read_timer_handler(void *argc) {
                 node->cb(NULL);
             }
             free(node);
+        }else {
+            printf("timer list is null\n");
         }
+        
+        random_usleep(1000 * 1000 ); //1s
     }
 
 }
