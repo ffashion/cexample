@@ -9,7 +9,7 @@ typedef struct map_node{
 }map_node_t;
 
 typedef struct {
-    int hash_size;
+    int bucket;
     map_node_t *map_node;
 }map_t;
 
@@ -24,7 +24,7 @@ static unsigned map_hash(const char *str) {
 int map_insert(map_t *map,char *key,int value) {
     
     unsigned unsign_key = map_hash(key);
-    int hash_size = map->hash_size;
+    int hash_size = map->bucket;
     //第一个节点无法判断是否存了值 所以永远不存值
     map_node_t *current = &map->map_node[unsign_key % hash_size];
     map_node_t *node = current;
@@ -44,21 +44,23 @@ int map_insert(map_t *map,char *key,int value) {
     new_node->key =  strdup(key);
     new_node->value = value;
     new_node->next = NULL;
+    return 0;
 }
 
 int map_search(map_t *map,char *key) {
     unsigned unsign_key = map_hash(key);
-    int hash_size = map->hash_size;
+    int hash_size = map->bucket;
     map_node_t *current = &map->map_node[unsign_key % hash_size];
     map_node_t *node = current->next;
     for( ;node ; node = node->next){
         if(strcmp(key,node->key) == 0) {
             return node->value;
         }
-    }  
+    }
+    return 0;
 }
 int map_free(map_t *map){
-    for(int i=0 ; i<map->hash_size ; i++) {
+    for(int i=0 ; i<map->bucket ; i++) {
         map_node_t *current = &map->map_node[i];
         map_node_t *node = current->next;
         
@@ -70,10 +72,11 @@ int map_free(map_t *map){
         }
     }
     free(map->map_node);
+    return 0;
 }
 
 int map_init(map_t *map,int hash_size){
-    map->hash_size = hash_size;
+    map->bucket = hash_size;
     map->map_node = (map_node_t *)malloc(hash_size * sizeof(map_node_t));
     memset(map->map_node,0,hash_size * sizeof(map_node_t));
     return 0;
