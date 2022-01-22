@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <time.h>
-#include <malloc.h>
+// #include <malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -52,6 +52,7 @@ int random_usleep(int range_ms) {
 int list_timer_init(list_t *list) {
     list->first = NULL;
     pthread_mutex_init(&list->mutex, NULL);
+    return 0;
 } 
 int list_timer_insert(list_t *list, time_t time, timer_cb cb) {
     list_node_timer_t *node;
@@ -141,6 +142,7 @@ int list_traveverse(list_t *list) {
 void *test_cb(void * argc) {
     static int i = 0;
     printf("this is test_cb %d\n",i++);
+    return NULL;
 }
 
 
