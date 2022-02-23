@@ -12,7 +12,7 @@ typedef struct {
     int bucket;
     map_node_t *map_node; //this is a array, dynamic alloc
 }map_t;
-
+//djb hash function
 static unsigned map_hash(const char *str) {
   unsigned hash = 5381;
   while (*str) {
