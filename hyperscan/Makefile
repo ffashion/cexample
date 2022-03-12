@@ -1,2 +1,2 @@
-hostprogs-always-y += hyperscan 
-HOSTLDLIBS_hyperscan := -I/usr/local/include/hs -L/usr/lib/x86_64-linux-gnu/ -lhs
+all:
+	gcc -g hyperscan.c -o hyperscan
