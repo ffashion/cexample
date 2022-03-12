@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #ifdef __i386__
 # define DECLARE_ARGS(val, low, high)   unsigned long long val
@@ -30,7 +31,12 @@ static inline uint64_t tsc_get(void)
 
 void main(void)
 {
-    uint64_t time;
-    time = tsc_get();
-    printf("0x%016llx\n", time);
+    uint64_t time1, time2;
+
+    time1 = tsc_get();
+    usleep(100000);
+    time2 = tsc_get();
+
+    time2 -= time1;
+    printf("tsc detected %lu.%03lu mhz\n", time2 / 100000, time2 % 100000);
 }
