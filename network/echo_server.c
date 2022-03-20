@@ -639,6 +639,9 @@ void echo_http_empty_handler(echo_event_t *wev) {
 }
 void
 echo_close_connection(echo_connection_t *c) {
+    if (c->buffer) {
+        free(c->buffer);
+    }
     if (c->read->active) {
         echo_epoll_del_event(c->read, READ_EVENT, 0);
     }
