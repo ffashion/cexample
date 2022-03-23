@@ -610,8 +610,9 @@ echo_http_wait_request_handler(echo_event_t *rev) {
     c = rev->data;
     
     buffer_size = (c->buffer_size) ? c->buffer_size: 1024;
-
-    c->buffer = echo_palloc(buffer_size);
+    if (!c->buffer) {
+        c->buffer = echo_palloc(buffer_size);
+    }
     n = c->recv(c, c->buffer, buffer_size);
     if (n == EAGAIN) {
         free(c->buffer);
