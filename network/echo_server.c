@@ -119,7 +119,7 @@ void echo_http_init_connection(echo_connection_t *c);
 void echo_http_empty_handler(echo_event_t *wev);
 static void echo_http_wait_request_handler(echo_event_t *rev);
 void echo_close_connection(echo_connection_t *c);
-int ngx_handle_read_event(echo_event_t *rev, unsigned flags);
+int echo_handle_read_event(echo_event_t *rev, unsigned flags);
 //base function
 void *echo_palloc(size_t size) {
     void *addr;
@@ -514,7 +514,7 @@ int echo_event_process_init(echo_cycle_t *cycle) {
         c->read->handler = (c->type == SOCK_STREAM) ?
                     echo_event_accept: echo_event_recvmsg;
 
-        if (echo_epoll_add_event(c->read, READ_EVENT, 0) == -1) {
+        if (echo_epoll_add_event(c->read, READ_EVENT, EPOLLET) == -1) {
             return ECHO_ERROR;
         }
     }
@@ -582,14 +582,13 @@ echo_epoll_process_event(echo_cycle_t *cycle, unsigned timer) {
     
 }
 int 
-ngx_handle_read_event(echo_event_t *rev, unsigned flags) {
+echo_handle_read_event(echo_event_t *rev, unsigned flags) {
 
     if (!rev->active && !rev->ready) {
-            if (echo_epoll_add_event(rev, READ_EVENT, EPOLLET)
-                == ECHO_ERROR)
-            {
-                return ECHO_ERROR;
-            }
+        if (echo_epoll_add_event(rev, READ_EVENT, EPOLLET)
+            == ECHO_ERROR) {
+            return ECHO_ERROR;
+        }
     }
     return ECHO_OK;
 }
@@ -624,6 +623,7 @@ echo_http_wait_request_handler(echo_event_t *rev) {
     }
     
     if (n == 0) {
+        //peer close tcp
         echo_close_connection(c);
     }
 
@@ -658,7 +658,7 @@ echo_http_init_connection(echo_connection_t *c) {
     c->read->handler = echo_http_wait_request_handler;
     c->write->handler = echo_http_empty_handler;
     
-    if (ngx_handle_read_event(c->read, 0) == ECHO_ERROR) {
+    if (echo_handle_read_event(c->read, 0) == ECHO_ERROR) {
         echo_close_connection(c);
         return;
     }
