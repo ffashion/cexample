@@ -1,4 +1,4 @@
-//have ip 
+// only mac
 #include <sys/ioctl.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +35,7 @@ int tap_alloc(int flag) {
     }
     memset(&ifr, 0, sizeof(struct ifreq));
     ifr.ifr_flags = flag;
-    strcpy(ifr.ifr_name, "tap0");
+    strcpy(ifr.ifr_name, "tun0");
 
     if (ioctl(fd, TUNSETIFF, &ifr)  < 0) {
         close(fd);
@@ -44,26 +44,23 @@ int tap_alloc(int flag) {
 
     return fd;
 }
-// step 1: sudo ifconfig tap0 192.168.1.2/24
+// step 1: sudo ifconfig tun0 192.168.1.2/24
 // step 2: ping or curl the other ips, example 192.168.1.3
 
 int	main(int argc, char **argv) {
     int fd, n;
-    char buf[1024];
-    //set TAP Flag, get IP data
-    fd = tap_alloc(IFF_TAP | IFF_NO_PI);
+    char buf[48];
+    fd = tap_alloc(IFF_TUN | IFF_NO_PI);
     if(fd < 0) {
         perror("tap alloc");
         return -1;;
     }
     //set ip address 
-    system("sudo ifconfig tap0 192.168.1.2/24");
+    system("sudo ifconfig tun0 192.168.1.2/24");
     for (;;) {
         n = read(fd, buf, sizeof(buf));
         printf("read %d byte\n", n);
         hexToString((unsigned char *)buf, NULL, n, 1);
     }
-    
-
     return 0;
 }
