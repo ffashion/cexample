@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <linux/if.h>
 void hexToString(unsigned char *hex, char *str, int len, int output) {
   if (str == NULL) {
     str = malloc(2 * len) ;
@@ -63,7 +64,6 @@ int	main(int argc, char **argv) {
         printf("read %d byte\n", n);
         hexToString((unsigned char *)buf, NULL, n, 1);
     }
-    
-
+    close(fd);
     return 0;
 }
