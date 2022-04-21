@@ -87,7 +87,10 @@ int	main(int argc, char **argv) {
     //set ip address 
     system("sudo ifconfig tap0 192.168.1.2/24");
     for (;;) {
-        n = read(fd, buf, sizeof(buf));
+        //(1) user choose a ip to send data, his ip and the ip on the tap0 in the same subnet.
+        //(2) user send's data which we have captured
+        //(3) we can create a socket to send (1)and(2)' data, now. so we create a vpn, now.
+        n = read(fd, buf, sizeof(buf)); //when some people use tap0 interface(listen, accept, connect), this have some data.
         
         debug_output_mac("source mac", recv_ethhdr->h_source);
         debug_output_mac("dest mac:", recv_ethhdr->h_dest);
