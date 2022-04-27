@@ -77,11 +77,11 @@ int main(int argc, char *argv[])
 	const u_char *packet;		/* The actual packet */
     pcap_if_t *devs, *device;
     char *ifname;
-    int cnt;
+    int packet_q_len;
 
     /* Init var */
     ifname = "ens3";
-    cnt = 1;
+    packet_q_len = 1;
 
 	/* Define the device */
 	if (pcap_findalldevs(&devs, errbuf) < 0) {
@@ -112,10 +112,10 @@ int main(int argc, char *argv[])
 	/* Grab a packet */
     for (;;) {
         //pcap_dispatch fountional only process the first batch of packets received from system
-        if (pcap_dispatch(handle, cnt, read_packet, NULL) != 0) {
+        if (pcap_dispatch(handle, packet_q_len, read_packet, NULL) != 0) {
             break;
         }
-        //there you can do something
+        //there you can do something 
     }
 	/* And close the session */
 	pcap_close(handle);
