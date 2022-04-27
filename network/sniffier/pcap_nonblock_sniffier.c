@@ -1,4 +1,3 @@
-
 #include <pcap/pcap.h>
 /* base */
 #include <stdio.h>
@@ -34,6 +33,13 @@
 #define IP4_HDRLEN 20  // IPv4 header length
 #define ICMP_HDRLEN 8  // ICMP header length for echo request, excludes data
 
+static int pcap_try_reopen(pcap_t *handle) {
+    int pcap_activate_r = pcap_activate(handle);
+    if (pcap_activate_r != 0) {
+        return pcap_activate_r;
+    }
+    return 0;
+}
 
 void read_packet(u_char *user, const struct pcap_pkthdr *header, const u_char *packet) {
     struct ethhdr *ethhdr;
@@ -65,8 +71,7 @@ void read_packet(u_char *user, const struct pcap_pkthdr *header, const u_char *p
     }
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 	pcap_t *handle;			/* Session handle */
 	char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 	struct bpf_program fp;		/* The compiled filter */
@@ -77,11 +82,11 @@ int main(int argc, char *argv[])
 	const u_char *packet;		/* The actual packet */
     pcap_if_t *devs, *device;
     char *ifname;
-    int packet_q_len;
+    int packet_q_len, rc;
 
     /* Init var */
-    ifname = "ens3";
-    packet_q_len = 1;
+    ifname = "ens5";
+    packet_q_len = 64;
 
 	/* Define the device */
 	if (pcap_findalldevs(&devs, errbuf) < 0) {
@@ -89,12 +94,18 @@ int main(int argc, char *argv[])
         return -1;
     }
     device = devs;
-    //find ens3
-    while (strlen(ifname) != strlen(device->name)) {
-        if (strcmp(ifname, device->name) == 0) {
-            break;
+    //find interface
+    while(device) {
+        if (strlen(ifname) == strlen(device->name)) {
+            if(strcmp(ifname, device->name) == 0) {
+                break;
+            }
         }
-        device = devs->next;
+        device = device->next;
+    }
+    if (!device) {
+        printf("warnning: nofound interface %s\n", ifname);
+        return -1;
     }
     
 	/* Find the properties for the device */
@@ -111,11 +122,24 @@ int main(int argc, char *argv[])
 	}
 	/* Grab a packet */
     for (;;) {
-        //pcap_dispatch fountional only process the first batch of packets received from system
-        if (pcap_dispatch(handle, packet_q_len, read_packet, NULL) != 0) {
-            break;
+        rc = pcap_dispatch(handle, packet_q_len, read_packet, NULL);
+        if (rc == 0 || rc == PCAP_ERROR_BREAK) {
+            if (rc == PCAP_ERROR_BREAK) {
+                return -1;
+            }
+            //this packet process timeout, you should process it
+
+        }else if (rc < 0) {
+            printf("the interface is down, we try to reopen it \n");
+            int times = 1;
+            //the interface is down, you should reopen it
+            do {
+                usleep(50000);
+                rc = pcap_try_reopen(handle);
+                printf("try times, %d\r", times++);
+                fflush(NULL);
+            } while (rc < 0);
         }
-        //there you can do something 
     }
 	/* And close the session */
 	pcap_close(handle);
