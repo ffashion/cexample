@@ -2,6 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+static inline int align_power2(int n) {
+    n |= n  >> 1;
+    n |= n  >> 2;
+    n |= n  >> 4;
+    n |= n  >> 8;
+    n |= n  >> 16;
+    return n + 1;
+}
 typedef struct map_node{
     char *key;
     char *value;
@@ -26,7 +34,7 @@ int map_insert(map_t *map,const char *key,const char *value) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     //第一个节点无法判断是否存了值 所以永远不存值
-    map_node_t *current = &map->map_node[unsign_key % bucket];
+    map_node_t *current = &map->map_node[unsign_key & (bucket - 1)];
     map_node_t *node = current;
     
     for( ; node->next; node = node->next){
@@ -51,7 +59,7 @@ int map_insert(map_t *map,const char *key,const char *value) {
 map_node_t *map_search(map_t *map,const char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
-    map_node_t *current = &map->map_node[unsign_key % bucket];
+    map_node_t *current = &map->map_node[unsign_key & (bucket - 1)];
     map_node_t *node = current->next;
     for( ; node; node = node->next){
         if(strcmp(key,node->key) == 0) {
@@ -64,7 +72,7 @@ map_node_t *map_search(map_t *map,const char *key) {
 int map_delete(map_t *map,const char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
-    map_node_t *current = &map->map_node[unsign_key % bucket];
+    map_node_t *current = &map->map_node[unsign_key & (bucket - 1)];
     map_node_t *node = current;
 
     for( ; node->next; node = node->next){
@@ -74,6 +82,7 @@ int map_delete(map_t *map,const char *key) {
             node->next = node->next->next;
             free(save->key);
             free(save->value);
+            free(save);
             return 0;
         }
     }
@@ -81,7 +90,7 @@ int map_delete(map_t *map,const char *key) {
     return -1;
 }
 int map_free(map_t *map){
-    for(int i=0 ; i<map->bucket ; i++) {
+    for(int i=0 ; i < map->bucket ; i++) {
         map_node_t *current = &map->map_node[i];
         map_node_t *node = current->next;
         
@@ -98,7 +107,7 @@ int map_free(map_t *map){
 }
 
 int map_init(map_t *map,int bucket){
-    map->bucket = bucket;
+    map->bucket = align_power2(bucket);
     map->map_node = (map_node_t *)malloc(bucket * sizeof(map_node_t));
     memset(map->map_node,0,bucket * sizeof(map_node_t));
     return 0;
