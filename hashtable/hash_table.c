@@ -30,7 +30,7 @@ int map_insert(map_t *map,char *key,char *value) {
     map_node_t *node = current;
     
     for( ; node->next; node = node->next){
-        //we alrady have a same key-val, just rewrite it. 
+        //we alrady have a same key-val, just update it.
         if(strcmp(node->next->key,key) == 0) {
             free(node->next->value);
             node->next->value = strdup(value);
@@ -58,7 +58,27 @@ char *map_search(map_t *map,char *key) {
             return node->value;
         }
     }
-    return 0;
+    return NULL;
+}
+
+int map_delete(map_t *map,char *key) {
+    unsigned unsign_key = map_hash(key);
+    int bucket = map->bucket;
+    map_node_t *current = &map->map_node[unsign_key % bucket];
+    map_node_t *node = current;
+
+    for( ; node->next; node = node->next){
+        if(strcmp(node->next->key,key) == 0) {
+            //now we should delete node->next
+            map_node_t *save = node->next;
+            node->next = node->next->next;
+            free(save->key);
+            free(save->value);
+            return 0;
+        }
+    }
+    //we not find this key
+    return -1;
 }
 int map_free(map_t *map){
     for(int i=0 ; i<map->bucket ; i++) {
@@ -87,17 +107,44 @@ int map_init(map_t *map,int bucket){
 int main(int argc, char const *argv[])
 {   
     map_t map;
+    char *key_friend = "friend";
+    char *key_father = "father";
     char *value;
+    int rc;
+
+
     map_init(&map,1000);
-    map_insert(&map,"friends","kity");
-    map_insert(&map,"father","zhang");
-    map_insert(&map,"father","whang");
+    map_insert(&map,key_friend,"kity");
+    map_insert(&map,key_father, "zhang");
+    map_insert(&map,key_father,"whang");
 
 
-    value  = map_search(&map,"friends");
-    printf("friends:%s\n",value);
-    value  = map_search(&map,"father");
-    printf("father:%s\n",value);
+    value  = map_search(&map,key_friend);
+    if (value) {
+        printf("%s:%s\n",key_father,value);
+    }else {
+        printf("we dont find %s node\n", key_father);
+    }
+
+    value  = map_search(&map,key_father);
+    if (value) {
+        printf("%s:%s\n",key_father,value);
+    }else {
+        printf("we dont find %s node\n", key_father);
+    }
+    
+    if(map_delete(&map, key_father) == 0) {
+        printf("delete node %s ok\n",key_father);
+    }else {
+        printf("we dont find %s node\n", key_father);
+    }
+    
+    value  = map_search(&map,key_father);
+    if (value) {
+        printf("%s:%s\n",key_father,value);
+    }else {
+        printf("we dont find %s node\n", key_father);
+    }
 
     map_free(&map);
 
