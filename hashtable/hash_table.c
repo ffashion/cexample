@@ -14,14 +14,14 @@ typedef struct {
 }map_t;
 //djb hash function
 static unsigned map_hash(const char *str) {
-  unsigned hash = 5381;
-  while (*str) {
-    hash = ((hash << 5) + hash) ^ *str++;
-  }
-  return hash;
+    unsigned hash = 5381;
+    while (*str) {
+        hash = ((hash << 5) + hash) ^ *str++;
+    }
+    return hash;
 }
 
-int map_insert(map_t *map,char *key,char *value) {
+int map_insert(map_t *map,const char *key,const char *value) {
     
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
@@ -48,7 +48,7 @@ int map_insert(map_t *map,char *key,char *value) {
     return 0;
 }
 
-map_node_t *map_search(map_t *map,char *key) {
+map_node_t *map_search(map_t *map,const char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     map_node_t *current = &map->map_node[unsign_key % bucket];
@@ -61,7 +61,7 @@ map_node_t *map_search(map_t *map,char *key) {
     return NULL;
 }
 
-int map_delete(map_t *map,char *key) {
+int map_delete(map_t *map,const char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     map_node_t *current = &map->map_node[unsign_key % bucket];
