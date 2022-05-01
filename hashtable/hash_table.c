@@ -48,14 +48,14 @@ int map_insert(map_t *map,char *key,char *value) {
     return 0;
 }
 
-char *map_search(map_t *map,char *key) {
+map_node_t *map_search(map_t *map,char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     map_node_t *current = &map->map_node[unsign_key % bucket];
     map_node_t *node = current->next;
     for( ; node; node = node->next){
         if(strcmp(key,node->key) == 0) {
-            return node->value;
+            return node;
         }
     }
     return NULL;
@@ -107,6 +107,7 @@ int map_init(map_t *map,int bucket){
 int main(int argc, char const *argv[])
 {   
     map_t map;
+    map_node_t *node;
     char *key_friend = "friend";
     char *key_father = "father";
     char *value;
@@ -119,16 +120,16 @@ int main(int argc, char const *argv[])
     map_insert(&map,key_father,"whang");
 
 
-    value  = map_search(&map,key_friend);
-    if (value) {
-        printf("%s:%s\n",key_father,value);
+    node = map_search(&map,key_friend);
+    if (node) {
+        printf("%s:%s\n",key_father,node->value);
     }else {
         printf("we dont find %s node\n", key_father);
     }
 
-    value  = map_search(&map,key_father);
+    node  = map_search(&map,key_father);
     if (value) {
-        printf("%s:%s\n",key_father,value);
+        printf("%s:%s\n",key_father,node->value);
     }else {
         printf("we dont find %s node\n", key_father);
     }
@@ -139,9 +140,9 @@ int main(int argc, char const *argv[])
         printf("we dont find %s node\n", key_father);
     }
     
-    value  = map_search(&map,key_father);
-    if (value) {
-        printf("%s:%s\n",key_father,value);
+    node  = map_search(&map,key_father);
+    if (node) {
+        printf("%s:%s\n",key_father,node->value);
     }else {
         printf("we dont find %s node\n", key_father);
     }
