@@ -4,7 +4,7 @@
 
 typedef struct map_node{
     char *key;
-    int value;
+    char *value;
     struct map_node *next;
 }map_node_t;
 
@@ -21,7 +21,7 @@ static unsigned map_hash(const char *str) {
   return hash;
 }
 
-int map_insert(map_t *map,char *key,int value) {
+int map_insert(map_t *map,char *key,char *value) {
     
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
@@ -29,30 +29,31 @@ int map_insert(map_t *map,char *key,int value) {
     map_node_t *current = &map->map_node[unsign_key % bucket];
     map_node_t *node = current;
     
-    for(;node->next ; node = node->next){
+    for( ; node->next; node = node->next){
+        //we alrady have a same key-val, just rewrite it. 
         if(strcmp(node->next->key,key) == 0) {
-            node->next->value = value;
+            free(node->next->value);
+            node->next->value = strdup(value);
             return 0;
         }
         
     }
 
-    //以下此时node 为最后一个节点
+    //we not have a same key-val, we need insert a new key-value to the map
     map_node_t *new_node = (map_node_t *)malloc(sizeof(map_node_t));
     node->next = new_node;
-
-    new_node->key =  strdup(key);
-    new_node->value = value;
+    new_node->key   =  strdup(key);
+    new_node->value =  strdup(value);
     new_node->next = NULL;
     return 0;
 }
 
-int map_search(map_t *map,char *key) {
+char *map_search(map_t *map,char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     map_node_t *current = &map->map_node[unsign_key % bucket];
     map_node_t *node = current->next;
-    for( ;node ; node = node->next){
+    for( ; node; node = node->next){
         if(strcmp(key,node->key) == 0) {
             return node->value;
         }
@@ -67,6 +68,7 @@ int map_free(map_t *map){
         for( ; node ;) {
             map_node_t *next = node->next;
             free(node->key);
+            free(node->value);
             free(node);
             node = next;
         }
@@ -85,15 +87,17 @@ int map_init(map_t *map,int bucket){
 int main(int argc, char const *argv[])
 {   
     map_t map;
-
+    char *value;
     map_init(&map,1000);
-    map_insert(&map,"hello",4);
-    map_insert(&map,"hello",2);
-    map_insert(&map,"what",20);
-    int rc  = map_search(&map,"hello");
-    printf("%d\n",rc);
-    rc  = map_search(&map,"what");
-    printf("%d\n",rc);
+    map_insert(&map,"friends","kity");
+    map_insert(&map,"father","zhang");
+    map_insert(&map,"father","whang");
+
+
+    value  = map_search(&map,"friends");
+    printf("friends:%s\n",value);
+    value  = map_search(&map,"father");
+    printf("father:%s\n",value);
 
     map_free(&map);
 
