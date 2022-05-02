@@ -705,6 +705,12 @@ echo_event_accept(echo_event_t *ev) {
         echo_close_accepted_connection(c);
         return;
     }
+
+    //set non-blocking
+    if (echo_nonblocking(s) == -1) {
+        close(s);
+        return ;
+    }
     c->recv = ngx_unix_recv;
     c->send = ngx_unix_sned;
 
