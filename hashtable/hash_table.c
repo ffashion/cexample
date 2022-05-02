@@ -114,8 +114,8 @@ int map_free(map_t *map){
 
 int map_init(map_t *map,int bucket){
     map->bucket = ceil_to_power_of_2(bucket);
-    map->map_node = (map_node_t *)malloc(bucket * sizeof(map_node_t));
-    memset(map->map_node,0,bucket * sizeof(map_node_t));
+    map->map_node = (map_node_t *)malloc(map->bucket * sizeof(map_node_t));
+    memset(map->map_node,0,map->bucket * sizeof(map_node_t));
     return 0;
 }
 
