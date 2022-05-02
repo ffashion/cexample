@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
+uint32_t ceil_to_power_of_2(uint32_t x)
+  { return (UINT32_MAX >> __builtin_clz(x - 1)) + 1;  }
+
+#if 0
 static inline int align_power2(int n) {
     n |= n  >> 1;
     n |= n  >> 2;
@@ -10,6 +15,7 @@ static inline int align_power2(int n) {
     n |= n  >> 16;
     return n + 1;
 }
+#endif
 typedef struct map_node{
     char *key;
     char *value;
@@ -107,7 +113,7 @@ int map_free(map_t *map){
 }
 
 int map_init(map_t *map,int bucket){
-    map->bucket = align_power2(bucket);
+    map->bucket = ceil_to_power_of_2(bucket);
     map->map_node = (map_node_t *)malloc(bucket * sizeof(map_node_t));
     memset(map->map_node,0,bucket * sizeof(map_node_t));
     return 0;
