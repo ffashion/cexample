@@ -28,8 +28,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#define PG_SIZE 4096
-
+int page_size = 0;
 struct jmp {
   uint32_t opcode : 8;
   int32_t offset : 32;
@@ -38,13 +37,13 @@ struct jmp {
 #define JMP(off) ((struct jmp){0xe9, off - sizeof(struct jmp)})
 
 static inline bool within_page(void *addr) {
-    return (uintptr_t)addr % PG_SIZE + sizeof(struct jmp) <= PG_SIZE;
+    return (uintptr_t)addr % page_size + sizeof(struct jmp) <= page_size;
 }
 
 void DSU(void *old, void *new) {
 
-    void *base = (void *)((uintptr_t)old & ~(PG_SIZE - 1));
-    size_t len = PG_SIZE * (within_page(old) ? 1 : 2);
+    void *base = (void *)((uintptr_t)old & ~(page_size - 1));
+    size_t len = page_size * (within_page(old) ? 1 : 2);
     int flags = PROT_WRITE | PROT_READ | PROT_EXEC;
 
     if (mprotect(base, len, flags) == 0) {
@@ -62,6 +61,7 @@ void foo_new() {
 }
 
 int main() {
+    page_size = (int)sysconf(_SC_PAGESIZE);
     foo();
     DSU(foo, foo_new);
     foo();
