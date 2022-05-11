@@ -270,6 +270,11 @@ int main(int argc, char const *argv[]){
         }
         for (int i=0 ; i <= epoll_num-1 ;i++) {
             epoll_data = events[i].data.ptr;
+            int data;
+            if (read(epoll_data->fd, &data,sizeof(data)) <= 0) {
+                //reset or close
+                continue;
+            }
             printf("%s\n", epoll_data->ip);
         }
 
