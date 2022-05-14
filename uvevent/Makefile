@@ -1,2 +1,2 @@
 all:
-	gcc -g uv_timer.c -o uv_timer
+	gcc -g uv_timer.c -o uv_timer -luv
