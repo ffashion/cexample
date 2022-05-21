@@ -39,10 +39,17 @@ int map_insert(map_t *map,const char *key,const char *value) {
     
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
-    //第一个节点无法判断是否存了值 所以永远不存值
+    //第一个节点无法判断是否存了值(因为在init的时候 就已经分配了空间 head就已经有了值)
     map_node_t *current = &map->map_node[unsign_key & (bucket - 1)];
     map_node_t *node = current;
     
+    if (!node->value) {
+        node->key   =  strdup(key);
+        node->value =  strdup(value);
+        node->next = NULL;
+        return 0;
+    }
+
     for( ; node->next; node = node->next){
         //we alrady have a same key-val, just update it.
         if(strcmp(node->next->key,key) == 0) {
@@ -66,8 +73,10 @@ map_node_t *map_search(map_t *map,const char *key) {
     unsigned unsign_key = map_hash(key);
     int bucket = map->bucket;
     map_node_t *current = &map->map_node[unsign_key & (bucket - 1)];
-    map_node_t *node = current->next;
-    for( ; node; node = node->next){
+    map_node_t *node = current;
+    
+    
+    for( ; node && node->key; node = node->next) {
         if(strcmp(key,node->key) == 0) {
             return node;
         }
@@ -98,7 +107,11 @@ int map_delete(map_t *map,const char *key) {
 int map_free(map_t *map){
     for(int i=0 ; i < map->bucket ; i++) {
         map_node_t *current = &map->map_node[i];
-        map_node_t *node = current->next;
+        map_node_t *node = current;
+        
+        free(node->key);
+        free(node->value);
+        node = node->next;
         
         for( ; node ;) {
             map_node_t *next = node->next;
