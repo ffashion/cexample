@@ -55,8 +55,8 @@ static int __init module_sysfs_init(void) {
 }
 static void __exit module_sysfs_exit(void) {
     if (obj) {
-        printk("free %p kobject\n", obj);
-        kobject_del(obj);
+        kfree(param_buf);
+        kobject_put(obj);
     }
 }
 
