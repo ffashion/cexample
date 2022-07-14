@@ -18,16 +18,15 @@ int dictKeyCompare(dict *d, const void *key1,
 
 void dictKeyDestructor(dict *d, void *val)
 {
-    (void)d;
+    (void)d, (void)val;
     free(val);
 }
 
 void dictValDestructor(dict *d, void *val)
 {
-    (void)d;
+    (void)d, (void)val;
 
-    if (val == NULL) return; /* Lazy freeing will set value to NULL. */
-    // decrRefCount(val);
+    free(val);
 }
 
 int dictExpandAllowed(size_t moreMem, double usedRatio) {
@@ -40,6 +39,7 @@ int dictExpandAllowed(size_t moreMem, double usedRatio) {
 
 size_t dictEntryMetadataSize(dict *d) {
    (void)d;
+   //we can use metadata to store the expire time
    return 0;
 }
 
@@ -69,9 +69,12 @@ int	main(int argc, char **argv) {
 
     for (int i = 0; i <= 10; i++) {
         char *key = malloc(10);
+        char *val = malloc(10);
         memset(key, 0, 10);
         sprintf(key, "key%d", i);
-        dictAdd(d, key, "value");
+        sprintf(val, "value");
+        //if dict have this key, we dont insert.
+        dictAdd(d, key, val);
     }
 
     for (int i = 0; i <= 10; i++) {
@@ -89,7 +92,24 @@ int	main(int argc, char **argv) {
         sprintf(key, "key%d", i);
         dictDelete(d, key);
     }
-    
+
+
+    char *key = malloc(10);
+    for (int i = 0; i <= 10; i++) {
+        char *val = malloc(10);
+        sprintf(key, "key");
+        sprintf(val, "value%d", i);
+
+        if (dictReplace(d, key, val) == 1) {
+            printf("scratch: %s->%s\n",(char *)key,val);
+        }else {
+            printf("already: %s->%s\n",(char *)key,(char *)val);
+        }
+    }
+    entry = dictFind(d, "key");
+    printf("%s->%s\n",(char *)entry->key,(char *)entry->v.val);
+
+
     dictRelease(d);
 
     // printf("%s\n", (char *)entry->v.val);
