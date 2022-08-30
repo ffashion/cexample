@@ -63,6 +63,34 @@ void token_try_number(token_obj_t *obj) {
 
 int expr_value(token_obj_t *obj);
 void next(token_obj_t *obj);
+int first_priority(token_obj_t *obj);
+int second_priority(token_obj_t *obj, int lvalue);
+int third_priority(token_obj_t *obj, int lvalue);
+
+void next(token_obj_t *obj) {
+    // skip white space
+    char *start = obj->start;
+    while (*start == ' ' || *start == '\t') {
+        start++;
+    }
+
+    obj->token = *start++;
+
+    if (obj->token >= '0' && obj->token <= '9' ) {
+        obj->value = obj->token - '0';
+        obj->token = Num;
+
+        while (*start >= '0' && *start <= '9') {
+            obj->value = obj->value*10 + *start - '0';
+            start++;
+        }
+        obj->start = start;
+        return;
+    }
+    obj->start = start;
+
+    //other token return    
+}
 
 void match_next(token_obj_t *obj, int tk) {
 
@@ -71,6 +99,19 @@ void match_next(token_obj_t *obj, int tk) {
         exit(-1);
     }
     next(obj);
+}
+
+int subexpr_value(token_obj_t *obj) {
+    //fist priority is (
+    int lvalue = first_priority(obj);
+    //second priority is * and /
+    return second_priority(obj, lvalue);
+}
+
+int expr_value(token_obj_t *obj) {
+    int lvalue = subexpr_value(obj);
+    //the last  priority is + and /
+    return third_priority(obj, lvalue);
 }
 
 /*
@@ -109,13 +150,6 @@ int second_priority(token_obj_t *obj, int lvalue) {
     }
 }
 
-int subexpr_value(token_obj_t *obj) {
-    //fist priority is (
-    int lvalue = first_priority(obj);
-    //second priority is * and /
-    return second_priority(obj, lvalue);
-}
-
 int third_priority(token_obj_t *obj, int lvalue) {
     char token = obj->token;
     if (token == '+') {
@@ -130,39 +164,6 @@ int third_priority(token_obj_t *obj, int lvalue) {
         return lvalue;
     }
 }
-
-int expr_value(token_obj_t *obj) {
-    int lvalue = subexpr_value(obj);
-    //the last  priority is + and /
-    return third_priority(obj, lvalue);
-}
-
-void next(token_obj_t *obj) {
-    // skip white space
-    char *start = obj->start;
-    while (*start == ' ' || *start == '\t') {
-        start++;
-    }
-
-    obj->token = *start++;
-
-    if (obj->token >= '0' && obj->token <= '9' ) {
-        obj->value = obj->token - '0';
-        obj->token = Num;
-
-        while (*start >= '0' && *start <= '9') {
-            obj->value = obj->value*10 + *start - '0';
-            start++;
-        }
-        obj->start = start;
-        return;
-    }
-    obj->start = start;
-
-    //other token return
-    
-}
-
 
 void *malloc_safe(size_t size) {
     void *p;
