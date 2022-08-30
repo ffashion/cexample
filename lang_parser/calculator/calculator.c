@@ -20,45 +20,81 @@
 speical:
     (20 + 5)
 */
-enum token_type {Num, Add, Sub, Mul, Div};
+enum token_type {Num = 0, Add, Sub, Mul, Div, Left_Bra, Right_Bra, Line_End};
+
+typedef int (*op)(int x, int y);
+
+int add(int x, int y) {
+    return x + y;
+}
+
+int sub(int x, int y) {
+    return x - y;
+}
+
+int mul(int x, int y) {
+    return x * y;
+}
+
+//use mdiv to avoid conflict with stdlib's div function
+int mdiv(int x , int y) {
+    return x / y;
+}
 
 struct token {
     int priority;
     char c;
     enum token_type type;
+    op op;
 };
 
 struct token tokens[] = {
     {
         .c = 0xff,
+        .priority = -1,
         .type = Num
     },
     {
         .c = '+',
         .priority = 0,
-        .type = Add
+        .type = Add,
+        .op = add
     }, 
     {
         .c = '-',
         .priority = 0,
-        .type = Sub
+        .type = Sub,
+        .op = sub
     }, 
     {
         .c = '*',
         .priority = 1,
-        .type = Mul
+        .type = Mul,
+        .op = mul
     }, 
     {
         .c = '/',
         .priority = 1,
-        .type = Div
+        .type = Div,
+        .op = mdiv
     },
+    {
+        .c = '(',
+        .type = Left_Bra,
+        .priority = 2,
+    },
+    {
+        .c = ')',
+        .type = Right_Bra,
+        .priority = 2,
+    }, 
+    {
+        .c = '\n',
+        .type = Line_End,
+        .priority = -1,
+    }
 
 };
-
-void token_try_number(token_obj_t *obj) {
-
-}
 
 
 int expr_value(token_obj_t *obj);
@@ -90,6 +126,12 @@ void next(token_obj_t *obj) {
     obj->start = start;
 
     //other token return    
+    for (int i = 0; i < ARRAY_SIZE(tokens); i++) {
+        if (obj->token == tokens[i].c) {
+            obj->token = tokens[i].type;
+            break;
+        }
+    }
 }
 
 void match_next(token_obj_t *obj, int tk) {
@@ -114,53 +156,45 @@ int expr_value(token_obj_t *obj) {
     return third_priority(obj, lvalue);
 }
 
-/*
-    factor process this two conditions 
-        condition 1: 1 + 2, now token is 1
-        condition 2: (1 + 2), now token is (
-*/
+
+int priority_process(token_obj_t *obj) {
+    return 0;
+}
+
+
 int first_priority(token_obj_t *obj) {
     int value = obj->value;
     char token = obj->token;
-    int ret = 0;
-    if (token == '(') {
-        //also call next() read token..
-        match_next(obj, '(');
-        ret = expr_value(obj);
-        match_next(obj, ')');
-    } else {
-        ret = value;
+    if (tokens[token].priority == 2) {
+        if (token == Left_Bra) {
+            match_next(obj, Left_Bra);
+            value = expr_value(obj);
+            match_next(obj, Right_Bra);
+        }
+    }else {
         match_next(obj, Num);
     }
-    return ret;
+    return value;
 }
 
 int second_priority(token_obj_t *obj, int lvalue) {
     char token = obj->token;
-    if (token == '*') {
-        match_next(obj, '*');
-        int value = lvalue * first_priority(obj);
+    if (tokens[token].priority == 1) {
+        match_next(obj, token);
+        int value = tokens[token].op(lvalue, first_priority(obj));
         return second_priority(obj, value);
-    } else if (token == '/') {
-        match_next(obj, '/');
-        int value = lvalue / first_priority(obj);
-        return second_priority(obj, value);
-    } else {
+    }else {
         return lvalue;
     }
 }
 
 int third_priority(token_obj_t *obj, int lvalue) {
     char token = obj->token;
-    if (token == '+') {
-        match_next(obj, '+');
-        int value = lvalue + subexpr_value(obj);
+    if (tokens[token].priority == 0) {
+        match_next(obj, token);
+        int value = tokens[token].op(lvalue, subexpr_value(obj));
         return third_priority(obj, value);
-    } else if (token == '-') {
-        match_next(obj, '-');
-        int value = lvalue - subexpr_value(obj);
-        return third_priority(obj, value);
-    } else {
+    }else {
         return lvalue;
     }
 }

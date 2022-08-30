@@ -20,4 +20,8 @@ typedef struct token_obj {
 
 }token_obj_t;
 
+#define ARRAY_SIZE(arr) ( \
+    sizeof(arr) / sizeof((arr)[0]) \
+)
+
 #endif  //!__CALCULATOR__H__
