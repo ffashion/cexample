@@ -11,6 +11,10 @@
 // 所以需要 include Bison 生成的头文件
 #include "lang.tab.hpp"
 
+// define YY_DECL to modify yylex return type, function name, and para...
+#define YY_DECL int yylex (std::unique_ptr<std::string> &ast)
+YY_DECL;
+
 using namespace std;
 
 %}

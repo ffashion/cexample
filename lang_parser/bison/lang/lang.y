@@ -12,16 +12,21 @@
 #include <string>
 // this is parser by bison, product token, 语法规则
 // 声明 lexer 函数和错误处理函数
-int yylex();
+int yylex(std::unique_ptr<std::string> &ast);
+// int yylex();
 void yyerror(std::unique_ptr<std::string> &ast, const char *s);
 
 using namespace std;
 
 %}
 
+// %param, %parse-param, %lex-params 
+// The parsing context.
+// %param 同时设置yyparse和yylex的参数, 在c++中就是设置parser的构造函数的参数
+%param { std::unique_ptr<std::string> &ast }
 
 // 用于设定 yyparse() 函数的入口参数
-%parse-param { std::unique_ptr<std::string> &ast }
+// %parse-param { std::unique_ptr<std::string> &ast }
 
 // 用于定义YYSTYPE 类型的内容
 %union {
