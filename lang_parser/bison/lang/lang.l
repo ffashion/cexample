@@ -27,10 +27,23 @@ Decimal       [1-9][0-9]*
 Octal         0[0-7]*
 Hexadecimal   0[xX][0-9a-fA-F]+
 
+%{
+    // Code run each time a pattern is matched.
+    // we can't call printf directly, must use  constructor, destructor, or type conversion...
+    #define YY_USER_ACTION printf("%d len string, matched\n", yyleng);
+%}
+
 %%
 
-{WhiteSpace}    { /* 忽略, 不做任何操作 */ }
-{LineComment}   { /* 忽略, 不做任何操作 */ }
+%{
+    // Code run each time yylex is called.
+    static int __mycount = 0;
+    __mycount++;
+    printf("called yylex...%d\n",__mycount);
+%}
+
+{WhiteSpace}    { /* ignore, do not */ }
+{LineComment}   { /* ignore, do not */ }
 
 "int"           { return INT; }
 "return"        { return RETURN; }
