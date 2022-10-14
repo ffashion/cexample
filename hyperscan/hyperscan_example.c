@@ -116,7 +116,7 @@ static char *readInputData(const char *inputFN, unsigned int *length) {
         return NULL;
     }
 
-    char *inputData = malloc(dataLen);
+    char *inputData = (char *)malloc(dataLen);
     if (!inputData) {
         fprintf(stderr, "ERROR: unable to malloc %ld bytes\n", dataLen);
         fclose(f);
