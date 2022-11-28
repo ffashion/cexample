@@ -6,13 +6,16 @@
 #include  <signal.h>
 #include  <unistd.h>
 #include  <memory.h>
-
+#include  <termio.h>
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 
 typedef struct game_cycle {
     int tfd; /*terminal fd*/
-
+    struct termios save;
+    struct termios raw;
+    int restore_terminal;
+    int need_exit;
 }game_cycle_t;
 
 typedef struct cli_opt {
@@ -129,6 +132,8 @@ struct game_ops gops_tables[]  = {
         .next_head = gb_get_down_node
     }
 };
+
+static game_cycle_t cycle;
 
 // 0 stand for the node is null node
 inline bool 
@@ -498,7 +503,6 @@ game_board_node_t *gb_find_null_node(game_board_t *gb){
         node = gb_find_node_by_coordinate(gb, x0, y0);
 
         if (gb_node_is_null(node)) {
-            printf("x0: %d, y0: %d\n", x0, y0);
             return node;
         }
     }
@@ -612,14 +616,24 @@ cli_opt_t read_cli_opt(int argc, char **argv) {
     return opt;
 }
 
-void signal_handler(int sig) {
-
-    exit(0);
+void process_signal() {
+    if (cycle.restore_terminal) {
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &cycle.save) != 0) {
+            exit(EXIT_FAILURE);
+        }
+    }
+    if (cycle.need_exit) {
+        exit(EXIT_SUCCESS);
+    }
+    return;
 }
+
 
 void console_handler(int sig) {
-
+    cycle.restore_terminal = 1;
+    cycle.need_exit = 1;
 }
+
 
 #define KEYCODE_U 0x41
 #define KEYCODE_D 0x42
@@ -653,17 +667,35 @@ enum game_op read_op_from_cli() {
     return op;
 }
 
+int init_console(game_cycle_t *cycle) {
+    struct termios raw;
+    if (tcgetattr(STDIN_FILENO, &cycle->save) != 0) {
+        return -1;
+    }
+    
+    memcpy(&raw, &cycle->save, sizeof(struct termios));
+    raw.c_lflag &=~ (ICANON | ECHO);
+    raw.c_cc[VEOL] = 1;
+    raw.c_cc[VEOF] = 2;
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+
+    cycle->raw = raw;
+
+    signal(SIGINT, console_handler);
+
+    return 0;
+}
+
+
 int	main(int argc, char **argv) {
     game_board_t *gb;
     cli_opt_t opt;
     enum game_op op = 0;
+    
+    init_console(&cycle);
 
     opt = read_cli_opt(argc, argv);
     
-    //register singal handler 
-    signal(SIGINT, signal_handler);
-
-
     if ((gb = gb_create(opt.gb_size)) == NULL) {
         return -1;
     }
@@ -689,7 +721,7 @@ int	main(int argc, char **argv) {
     
     for (;;) {
         //process signal 
-
+        process_signal();
         //read op from cli
         op =  read_op_from_cli();
         if (op == -1) {
