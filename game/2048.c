@@ -58,8 +58,10 @@ struct game_ops {
     enum game_op op;
     gb_update_pt gb_merge;
     unsigned       corner;
-    merge_direction_pt merge_dir1;
-    merge_direction_pt merge_dir2;
+    unsigned       head;
+    merge_direction_pt merge_dir;
+    merge_direction_pt merge_edge_dir;
+    merge_direction_pt next_head;
 };
 
 bool gb_merge(game_board_t *gb, game_ops_t *ops);
@@ -97,29 +99,34 @@ struct game_ops gops_tables[]  = {
         .op = game_op_up,
         .gb_merge = gb_merge,
         .corner = offsetof(game_board_t, left_top),
-        .merge_dir1 = gb_get_right_node,
-        .merge_dir2 = gb_get_down_node,
+        .merge_dir = gb_get_right_node,
+        .merge_edge_dir = gb_get_down_node,
+        .next_head = gb_get_right_node
     },
     {
         .op = game_op_down,
         .gb_merge = gb_merge,
         .corner = offsetof(game_board_t, left_down),
-        .merge_dir1 = gb_get_right_node,
-        .merge_dir2 = gb_get_up_node,
+        .merge_dir = gb_get_right_node,
+        .merge_edge_dir = gb_get_up_node,
+        .next_head = gb_get_right_node
+
     }, 
     {
         .op = game_op_left,
         .gb_merge = gb_merge,
         .corner = offsetof(game_board_t, left_top),
-        .merge_dir1 = gb_get_down_node,
-        .merge_dir2 = gb_get_right_node,
+        .merge_dir = gb_get_down_node,
+        .merge_edge_dir = gb_get_right_node,
+        .next_head = gb_get_down_node
     },
     {
         .op = game_op_right,
         .gb_merge = gb_merge,
         .corner = offsetof(game_board_t, right_top),
-        .merge_dir1 = gb_get_down_node,
-        .merge_dir2 = gb_get_left_node,
+        .merge_dir = gb_get_down_node,
+        .merge_edge_dir = gb_get_left_node,
+        .next_head = gb_get_down_node
     }
 };
 
@@ -133,6 +140,9 @@ inline game_board_node_t *
 gb_get_up_node(game_board_node_t *node, game_board_node_t *head) {
     game_board_node_t *ret;
     ret = list_prev_entry(node, vertical);
+#if 0
+    printf("(%d, %d)up node is (%d, %d)\n", node->coord.x, node->coord.y, ret->coord.x, ret->coord.y);
+#endif
     if (ret == head) {
         return NULL;
     }
@@ -143,6 +153,9 @@ inline game_board_node_t *
 gb_get_down_node(game_board_node_t *node, game_board_node_t *head) {
     game_board_node_t *ret;
     ret = list_next_entry(node, vertical);
+#if 0
+    printf("(%d, %d) down node is (%d, %d)\n", node->coord.x, node->coord.y, ret->coord.x, ret->coord.y);
+#endif
     if (ret == head) {
         return NULL;
     }
@@ -153,6 +166,9 @@ inline game_board_node_t *
 gb_get_left_node(game_board_node_t *node, game_board_node_t *head) {
     game_board_node_t *ret;
     ret = list_prev_entry(node, horizon);
+#if 0
+    printf("(%d, %d)left node is (%d, %d)\n", node->coord.x, node->coord.y, ret->coord.x, ret->coord.y);
+#endif
     if (ret == head) {
         return NULL;
     }
@@ -163,6 +179,9 @@ inline game_board_node_t *
 gb_get_right_node(game_board_node_t *node, game_board_node_t *head) {
     game_board_node_t *ret;
     ret = list_next_entry(node, horizon);
+#if 0
+    printf("(%d, %d)right node is (%d, %d)\n", node->coord.x, node->coord.y, ret->coord.x, ret->coord.y);
+#endif
     if (ret == head) {
         return NULL;
     }
@@ -198,7 +217,7 @@ gb_merge_part_edge(game_board_node_t *node, game_board_node_t *head, game_ops_t 
     bool merge = false;
     next = node;
     for (;;) {
-        if ((next = ops->merge_dir2(next, head)) == NULL) {
+        if ((next = ops->merge_edge_dir(next, head)) == NULL) {
             return merge;
         }
 
@@ -224,9 +243,10 @@ gb_merge_edge(game_board_t *gb, game_board_node_t *head, game_ops_t *ops) {
     int i;
     bool merge = false;
     node = head;
+
     for (i = 0; i < gb->size; i++) {
         merge |= gb_merge_part_edge(node, head, ops);
-        node = ops->merge_dir2(node, head);
+        node = ops->merge_edge_dir(node, head);
     }
  
     return merge;
@@ -247,45 +267,51 @@ gb_merge(game_board_t *gb, game_ops_t *ops) {
     
     for (i = 0; i < gb->size; i++) {
         merge |= gb_merge_edge(gb, node, ops);
-        node = ops->merge_dir1(node, *corner);
+        node = ops->merge_dir(node, *corner);
     }
     return merge;
 }
 
 void gb_init_line_list(game_board_t *gb, game_board_node_t* head, int y) {
     int i;
-    game_board_node_t* node;
+    game_board_node_t *node, *prev;
 
     INIT_LIST_HEAD(&head->horizon);
     
     node = head;
 
     node++; /*skip head*/
+    prev = head;
 
     node->coord = (coord_t){0, y};
 
     for (i = 0; i < gb->size -1; i++) {
-        list_add(&node->horizon, &head->horizon);
+        list_add(&node->horizon, &prev->horizon);
         node->coord = (coord_t){i + 1, y};
+        prev = node;
         node++;
     }
 }
 
 void gb_init_vert_list(game_board_t *gb, game_board_node_t* head, int x) {
     int i;
-    game_board_node_t* node;
+    game_board_node_t* node, *prev;
     INIT_LIST_HEAD(&head->vertical);
 
     node = head;
+
     node += gb->size;
+    prev = head;
     node->coord = (coord_t){x, 0};
 
     for (i = 0; i < gb->size -1; i++) {
-        list_add(&node->vertical, &head->vertical);
+        list_add(&node->vertical, &prev->vertical);
         node->coord = (coord_t){x, i+1};
+        prev = node;
         node += gb->size;
     }
 }
+
 game_board_t *gb_create(int size) {
     game_board_t *gb;
     game_board_node_t *node, *start;
@@ -334,11 +360,7 @@ game_board_t *gb_create(int size) {
         start++;
     }
 
-    
-    
-
     return gb;
-
 }
 
 bool gb_destroy(game_board_t *gb) {
@@ -402,6 +424,30 @@ bool gb_init_with_random(game_board_t *gb) {
         return false;
     }
     node->num = 2;
+    return true;
+}
+
+bool gb_init_with_nums(game_board_t *gb, int size, int *nums) {
+    int i, j;
+    game_board_node_t *node, *head, *line;
+    if (gb->size * gb->size != size) {
+        return false;
+    }
+
+    head = gb->left_top;
+    line = head;
+    node = line;
+
+    for (i = 0; i < gb->size; i++) {
+
+        for (j = 0; j < gb->size; j++) {
+            node->num = nums[i * gb->size + j];
+            node = gb_get_right_node(node, line);
+        }
+        line = gb_get_down_node(line, head);
+        node = line;
+    }
+
     return true;
 }
 
@@ -625,6 +671,19 @@ int	main(int argc, char **argv) {
     if (!gb_init_with_random(gb)) {
         return -1;
     }
+#define DDEBUG 0
+#if DDEBUG
+    int nums[16] = {
+    2, 4, 8, 16, 
+    32, 64, 0, 0,
+    0, 0, 0, 0, 
+    0, 0, 0, 0
+    };
+    if (!gb_init_with_nums(gb, ARRAY_SIZE(nums), nums)) {
+        gb_destroy(gb);
+        return -1;
+    }
+#endif 
 
     gb_draw(gb);
     
