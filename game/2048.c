@@ -63,7 +63,6 @@ struct game_ops {
     unsigned       head;
     merge_direction_pt merge_dir;
     merge_direction_pt merge_edge_dir;
-    merge_direction_pt next_head;
 };
 
 bool gb_merge(game_board_t *gb, game_ops_t *ops);
@@ -103,7 +102,6 @@ struct game_ops gops_tables[]  = {
         .corner = offsetof(game_board_t, left_top),
         .merge_dir = gb_get_right_node,
         .merge_edge_dir = gb_get_down_node,
-        .next_head = gb_get_right_node
     },
     {
         .op = game_op_down,
@@ -111,8 +109,6 @@ struct game_ops gops_tables[]  = {
         .corner = offsetof(game_board_t, left_down),
         .merge_dir = gb_get_right_node,
         .merge_edge_dir = gb_get_up_node,
-        .next_head = gb_get_right_node
-
     }, 
     {
         .op = game_op_left,
@@ -120,7 +116,6 @@ struct game_ops gops_tables[]  = {
         .corner = offsetof(game_board_t, left_top),
         .merge_dir = gb_get_down_node,
         .merge_edge_dir = gb_get_right_node,
-        .next_head = gb_get_down_node
     },
     {
         .op = game_op_right,
@@ -128,7 +123,6 @@ struct game_ops gops_tables[]  = {
         .corner = offsetof(game_board_t, right_top),
         .merge_dir = gb_get_down_node,
         .merge_edge_dir = gb_get_left_node,
-        .next_head = gb_get_down_node
     }
 };
 
