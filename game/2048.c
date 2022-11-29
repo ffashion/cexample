@@ -14,7 +14,6 @@ typedef struct game_cycle {
     int tfd; /*terminal fd*/
     struct termios save;
     struct termios raw;
-    int restore_terminal;
     int need_exit;
 }game_cycle_t;
 
@@ -340,13 +339,13 @@ game_board_t *gb_create(int size) {
     gb->left_top =  node;
     gb->right_top = gb->left_top + (size -1);
 
-    printf("offset :%ld\n", gb->right_top - gb->left_top);
+    // printf("offset :%ld\n", gb->right_top - gb->left_top);
 
     gb->left_down = gb->left_top + (size * (size - 1));
 
     gb->right_down = gb->left_down + (size -1);
 
-    printf("offset :%ld\n", gb->right_down - gb->left_top);
+    // printf("offset :%ld\n", gb->right_down - gb->left_top);
 
     //init the list
 
@@ -617,12 +616,11 @@ cli_opt_t read_cli_opt(int argc, char **argv) {
 }
 
 void process_signal() {
-    if (cycle.restore_terminal) {
+    
+    if (cycle.need_exit) {
         if (tcsetattr(STDIN_FILENO, TCSANOW, &cycle.save) != 0) {
             exit(EXIT_FAILURE);
         }
-    }
-    if (cycle.need_exit) {
         exit(EXIT_SUCCESS);
     }
     return;
@@ -630,7 +628,6 @@ void process_signal() {
 
 
 void console_handler(int sig) {
-    cycle.restore_terminal = 1;
     cycle.need_exit = 1;
 }
 
@@ -649,17 +646,23 @@ enum game_op read_op_from_cli() {
     
     switch (key_op) {
         case KEYCODE_U:
+        case 'w':
             op = game_op_up;
             break;
         case KEYCODE_D:
+        case 's':
             op = game_op_down;
             break;
         case KEYCODE_L:
+        case 'a':
             op = game_op_left;
             break;
+        case 'd':
         case KEYCODE_R:
             op = game_op_right;
             break;
+        case 'q':
+            cycle.need_exit = 1;
         default:
             return -1;
     }
