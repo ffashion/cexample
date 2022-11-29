@@ -40,7 +40,8 @@ typedef struct game_board {
     game_board_node_t *left_down;  //  ptr  (0, -size)
     game_board_node_t *right_top;  //  ptr (size, 0)
     game_board_node_t *right_down; //  ptr(-size, -size)
-
+    
+    int score;
 }game_board_t;
 
 typedef struct game_ops game_ops_t;
@@ -86,11 +87,10 @@ bool
 gb_merge_edge(game_board_t *gb, game_board_node_t *head, game_ops_t *ops);
 
 bool 
-gb_merge_part_edge(game_board_node_t *node, game_board_node_t *head, game_ops_t *ops);
-
+gb_merge_part_edge(game_board_t *gb, game_board_node_t *node, game_board_node_t *head, game_ops_t *ops);
 
 bool 
-gb_merge_node(game_board_node_t *node, game_board_node_t *second);
+gb_merge_node(game_board_t *gb, game_board_node_t *node, game_board_node_t *second);
 
 game_board_node_t *
 gb_find_node_by_coordinate(game_board_t *gb, int x, int y);
@@ -200,8 +200,11 @@ if the first next node matched, we should merge the  next node to this node. and
 */
 
 inline bool 
-gb_merge_node(game_board_node_t *node, game_board_node_t *second) {
+gb_merge_node(game_board_t *gb, game_board_node_t *node, game_board_node_t *second) {
     if (gb_node_is_null(node) || node->num == second->num) {
+        if (node->num == second->num) {
+            gb->score += node->num * 2;
+        }
         node->num += second->num;
         second->num = 0;
         return true;
@@ -210,7 +213,7 @@ gb_merge_node(game_board_node_t *node, game_board_node_t *second) {
 }
 
 inline bool 
-gb_merge_part_edge(game_board_node_t *node, game_board_node_t *head, game_ops_t *ops) {
+gb_merge_part_edge(game_board_t *gb, game_board_node_t *node, game_board_node_t *head, game_ops_t *ops) {
     game_board_node_t *next;
     bool merge = false;
     next = node;
@@ -223,7 +226,7 @@ gb_merge_part_edge(game_board_node_t *node, game_board_node_t *head, game_ops_t 
             continue;
         }
 
-        if (gb_merge_node(node, next)) {
+        if (gb_merge_node(gb, node, next)) {
             merge = true;
             continue;
         }
@@ -243,7 +246,7 @@ gb_merge_edge(game_board_t *gb, game_board_node_t *head, game_ops_t *ops) {
     node = head;
 
     for (i = 0; i < gb->size; i++) {
-        merge |= gb_merge_part_edge(node, head, ops);
+        merge |= gb_merge_part_edge(gb, node, head, ops);
         node = ops->merge_edge_dir(node, head);
     }
  
@@ -567,6 +570,7 @@ void gb_draw(game_board_t *gb) {
 
     line = gb->left_top;
 
+    printf("score: %d\n", gb->score);
     for (i = 0; i < gb->size; i++) {
         gb_draw_line(gb, line);
         line = gb_get_down_node(line, gb->left_top);
