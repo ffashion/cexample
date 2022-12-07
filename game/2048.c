@@ -567,7 +567,7 @@ gb_draw_line(game_board_t *gb, game_board_node_t *line) {
 void gb_draw(game_board_t *gb) {
     game_board_node_t *line;
     int i;
-
+    printf("\033[2J");
     line = gb->left_top;
 
     printf("score: %d\n", gb->score);
