@@ -1,5 +1,6 @@
 #include "token.h"
 #include "list.h"
+#include "mpool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,9 +50,9 @@ char *token_read_file(char *path) {
     return buf;
 }
 
-Token *new_token(tokentype_t type, char *start, char *end) {
+Token *new_token(tokentype_t type, char *start, char *end, mpool_t *pool) {
     Token *t;
-    t = malloc(sizeof(Token));
+    t = mpool_calloc(pool, sizeof(Token));
     if (t == NULL) {
         return NULL;
     }
@@ -63,9 +64,9 @@ Token *new_token(tokentype_t type, char *start, char *end) {
     return t;
 }
 
-Token *new_token_num(char *start, char *end) {
+Token *new_token_num(char *start, char *end, mpool_t *pool) {
     Token *t;
-    t = new_token(TK_NUM, start, end);
+    t = new_token(TK_NUM, start, end, pool);
     if (t == NULL) {
         return NULL;
     }
@@ -76,18 +77,18 @@ Token *new_token_num(char *start, char *end) {
     return t;
 }
 
-Token *new_token_eof(char *end) {
+Token *new_token_eof(char *end, mpool_t *pool) {
     Token *t;
-    t = new_token(TK_EOF, end , end);
+    t = new_token(TK_EOF, end , end, pool);
     if (t == NULL) {
         return NULL;
     }
     return t;
 }
 
-Token * new_token_punct(char *start, char *end) {
+Token * new_token_punct(char *start, char *end, mpool_t *pool) {
     Token *t;
-    t = new_token(TK_PUNCT, start , end);
+    t = new_token(TK_PUNCT, start , end, pool);
     if (t == NULL) {
         return NULL;
     }
@@ -97,10 +98,10 @@ Token * new_token_punct(char *start, char *end) {
 
 
 
-Token *tokenize(char *p) {
+Token *tokenize(char *p, mpool_t *pool) {
     Token *head, *t;
 
-    head = new_token(0, NULL, NULL);
+    head = new_token(0, NULL, NULL, pool);
     if (head == NULL) {
         return NULL;
     }
@@ -156,7 +157,7 @@ Token *tokenize(char *p) {
                 }
             }
 
-            t = new_token_num(q, p);
+            t = new_token_num(q, p, pool);
             if (t == NULL) {
                 goto err;
             }
@@ -171,7 +172,7 @@ Token *tokenize(char *p) {
 
         //Punctuators
         if (ispunct(*p)) {
-            t = new_token_punct(p, p +1);
+            t = new_token_punct(p, p +1, pool);
             if (t == NULL) {
                 goto err;
             }
@@ -186,7 +187,7 @@ Token *tokenize(char *p) {
         goto err;
     }
 
-    t = new_token_eof(p);
+    t = new_token_eof(p, pool);
     if (t == NULL) {
         goto err;
     }
@@ -198,11 +199,11 @@ err:
     return NULL;
 }
 
-Token *tokenize_file(char *file) {
+Token *tokenize_file(char *file, mpool_t *pool) {
     char *p = token_read_file(file);
     if (p == NULL) {
         return NULL;
     }
 
-    return tokenize(p);
+    return tokenize(p, pool);
 }

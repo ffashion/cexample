@@ -24,7 +24,7 @@ struct ast_node_s {
     long val;
 };
 
-Node* parser(Token *t);
+Node* parser(Token *tok, mpool_t *pool);
 
 int compute(Node *node);
 

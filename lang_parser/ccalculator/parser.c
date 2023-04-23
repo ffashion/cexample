@@ -1,12 +1,13 @@
 #include "parser.h"
 #include "list.h"
+#include "mpool.h"
 #include "token.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-static Node *primary(Token **rest, Token *tok);
-static Node *mul(Token **rest, Token *tok);
-static Node *expr(Token **rest, Token *tok);
+static Node *primary(Token **rest, Token *tok, mpool_t *pool);
+static Node *mul(Token **rest, Token *tok, mpool_t *pool);
+static Node *expr(Token **rest, Token *tok, mpool_t *pool);
 
 
 /*
@@ -142,21 +143,25 @@ static Token *skip(Token *tok, char *s) {
 }
 
 
-static Node *new_node(NodeKind kind) {
-    Node *node = calloc(1, sizeof(Node));
+static Node *new_node(NodeKind kind, mpool_t *pool) {
+    Node *node = mpool_calloc(pool, sizeof(Node));
+    if (node == NULL) {
+        return NULL;
+    }
+
     node->kind = kind;
     return node;
 }
 
-static Node *new_num(int val) {
-    Node *node = new_node(ND_NUM);
+static Node *new_num(int val, mpool_t *pool) {
+    Node *node = new_node(ND_NUM, pool);
     node->val = val;
     return node;
 }
 
 
-static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
-    Node *node = new_node(kind);
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, mpool_t *pool) {
+    Node *node = new_node(kind, pool);
     node->lhs = lhs;
     node->rhs = rhs;
     return node;
@@ -164,15 +169,15 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
 
 
 
-static Node *primary(Token **rest, Token *tok) {
+static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     if (equal(tok, "(")) {
-        Node *node = expr(&tok, list_next_entry(tok, list));
+        Node *node = expr(&tok, list_next_entry(tok, list), pool);
         *rest = skip(tok, ")");
         return node;
     }
 
     if (tok->kind == TK_NUM) {
-        Node *node = new_num(tok->val);
+        Node *node = new_num(tok->val, pool);
 
         *rest = list_next_entry(tok, list);
         return node;
@@ -183,18 +188,18 @@ static Node *primary(Token **rest, Token *tok) {
 }
 
 
-static Node *mul(Token **rest, Token *tok) {
-    Node *node = primary(&tok, tok);
+static Node *mul(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node = primary(&tok, tok, pool);
 
     for (;;) {
         if (equal(tok, "*")) {
-        node = new_binary(ND_MUL, node, primary(&tok, list_next_entry(tok, list)));
-        continue;
+            node = new_binary(ND_MUL, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            continue;
         }
 
         if (equal(tok, "/")) {
-        node = new_binary(ND_DIV, node, primary(&tok, list_next_entry(tok, list)));
-        continue;
+            node = new_binary(ND_DIV, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            continue;
         }
 
         *rest = tok;
@@ -210,18 +215,18 @@ static Node *add(Token **rest, Token *tok) {
 
 
 
-static Node *expr(Token **rest, Token *tok) {
-    Node *node = mul(&tok, tok);
+static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node = mul(&tok, tok, pool);
 
     for (;;) {
         if (equal(tok, "+")) {
-        node = new_binary(ND_ADD, node, mul(&tok, list_next_entry(tok, list)));
-        continue;
+            node = new_binary(ND_ADD, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            continue;
         }
 
         if (equal(tok, "-")) {
-        node = new_binary(ND_SUB, node, mul(&tok,list_next_entry(tok, list)));
-        continue;
+            node = new_binary(ND_SUB, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            continue;
         }
 
         *rest = tok;
@@ -230,9 +235,9 @@ static Node *expr(Token **rest, Token *tok) {
 }
 
 
-Node* parser(Token *tok) {
+Node* parser(Token *tok, mpool_t *pool) {
 
-    return expr(&tok, tok);
+    return expr(&tok, tok, pool);
     
     // return NULL;
 }

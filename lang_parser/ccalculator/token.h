@@ -2,6 +2,7 @@
 #define __TOKEN__H__
 
 #include "list.h"
+#include "mpool.h"
 #include <stddef.h>
 
 typedef struct token Token;
@@ -26,6 +27,6 @@ struct token {
 
 
 
-Token *tokenize(char *p);
-Token *tokenize_file(char *file);
+Token *tokenize(char *p, mpool_t *pool);
+Token *tokenize_file(char *file, mpool_t *pool);
 #endif  /*__TOKEN__H__*/
