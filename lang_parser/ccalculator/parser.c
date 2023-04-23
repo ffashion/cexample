@@ -217,15 +217,16 @@ static Node *add(Token **rest, Token *tok) {
 
 static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
     Node *node = mul(&tok, tok, pool);
+    
 
     for (;;) {
         if (equal(tok, "+")) {
-            node = new_binary(ND_ADD, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_binary(ND_ADD, node, mul(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
         if (equal(tok, "-")) {
-            node = new_binary(ND_SUB, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_binary(ND_SUB, node, mul(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
