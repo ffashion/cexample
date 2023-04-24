@@ -167,8 +167,23 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, mpool_t *pool) {
     return node;
 }
 
+static Node *new_add(Node *lhs, Node *rhs, mpool_t *pool) {
+    return new_binary(ND_ADD, rhs, lhs, pool);
+}
 
+static Node *new_sub(Node *lhs, Node *rhs, mpool_t *pool) {
+    return new_binary(ND_SUB, rhs, lhs, pool);
+}
 
+static Node *new_mul(Node *lhs, Node *rhs, mpool_t *pool) {
+    return new_binary(ND_MUL, rhs, lhs, pool);
+}
+
+static Node *new_div(Node *lhs, Node *rhs, mpool_t *pool) {
+    return new_binary(ND_DIV, rhs, lhs, pool);
+}
+
+//primary is the highest priority
 static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     if (equal(tok, "(")) {
         Node *node = expr(&tok, list_next_entry(tok, list), pool);
@@ -187,18 +202,17 @@ static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     return NULL;
 }
 
-
 static Node *mul(Token **rest, Token *tok, mpool_t *pool) {
     Node *node = primary(&tok, tok, pool);
 
     for (;;) {
         if (equal(tok, "*")) {
-            node = new_binary(ND_MUL, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_mul(node, primary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
         if (equal(tok, "/")) {
-            node = new_binary(ND_DIV, node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_div(node, primary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
@@ -207,32 +221,66 @@ static Node *mul(Token **rest, Token *tok, mpool_t *pool) {
     }
 }
 
+static Node *add(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
 
-static Node *add(Token **rest, Token *tok) {
-    
-    return NULL;
-}
-
-
-
-static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
-    Node *node = mul(&tok, tok, pool);
-    
+    node = mul(&tok, tok, pool);
 
     for (;;) {
+
         if (equal(tok, "+")) {
-            node = new_binary(ND_ADD, node, mul(&tok, list_next_entry(tok, list), pool), pool);
+            rnode = mul(&tok, list_next_entry(tok, list), pool);
+
+            node = new_add(node, rnode, pool);
             continue;
         }
 
         if (equal(tok, "-")) {
-            node = new_binary(ND_SUB, node, mul(&tok, list_next_entry(tok, list), pool), pool);
+            rnode = mul(&tok, list_next_entry(tok, list), pool);
+            node = new_sub(node, rnode, pool);
             continue;
         }
 
         *rest = tok;
         return node;
     }
+}
+
+static Node *logand(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = add(&tok, tok, pool);
+
+    for (;;) {
+        if (equal(tok, "&&")) {
+            rnode = add(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LOGAND, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+static Node *logor(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = logand(&tok, tok, pool);
+
+    for (;;) {
+        if (equal(tok, "||")) {
+            rnode = logand(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LOGOR, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+    
+}
+
+static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
+    return logor(rest, tok, pool);
 }
 
 
@@ -260,6 +308,14 @@ int compute(Node *node) {
 
     if (node->kind == ND_DIV) {
         return compute(node->lhs) / compute(node->rhs);
+    }
+
+    if (node->kind == ND_LOGAND) {
+        return compute(node->lhs) && compute(node->rhs);
+    }
+
+    if (node->kind == ND_LOGOR) {
+        return compute(node->lhs) || compute(node->rhs);
     }
 
     if (node->kind == ND_NUM) {

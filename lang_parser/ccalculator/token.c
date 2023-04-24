@@ -96,11 +96,26 @@ Token * new_token_punct(char *start, char *end, mpool_t *pool) {
     return t;
 }
 
+static int read_punct(char *p) {
+    static char *kw[] = {
+        "<<=", ">>=", "...", "==", "!=", "<=", ">=", "->", "+=",
+        "-=", "*=", "/=", "++", "--", "%=", "&=", "|=", "^=", "&&",
+        "||", "<<", ">>", "##",
+    };
 
+    for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
+        if (startswith(p, kw[i])) {
+            return strlen(kw[i]);
+        }
+    }
+
+    return ispunct(*p) ? 1 : 0;
+    
+}
 
 Token *tokenize(char *p, mpool_t *pool) {
     Token *head, *t;
-
+    int punct_len;
     head = new_token(0, NULL, NULL, pool);
     if (head == NULL) {
         return NULL;
@@ -167,17 +182,17 @@ Token *tokenize(char *p, mpool_t *pool) {
             continue;
         }
 
-
         //keyword
 
         //Punctuators
-        if (ispunct(*p)) {
-            t = new_token_punct(p, p +1, pool);
+        punct_len = read_punct(p);
+        if (punct_len) {
+            t = new_token_punct(p, p + punct_len, pool);
             if (t == NULL) {
                 goto err;
             }
-            p++;
-            
+
+            p += punct_len;
             list_add_tail(&t->list, &head->list);
 
             continue;

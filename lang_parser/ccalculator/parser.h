@@ -14,6 +14,8 @@ typedef enum {
     ND_MUL,       // *
     ND_DIV,       // /
     ND_COND,      // ?:
+    ND_LOGOR,
+    ND_LOGAND,
     ND_NUM,
 }NodeKind;
 
