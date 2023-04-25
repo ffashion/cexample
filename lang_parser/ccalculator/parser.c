@@ -168,19 +168,19 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, mpool_t *pool) {
 }
 
 static Node *new_add(Node *lhs, Node *rhs, mpool_t *pool) {
-    return new_binary(ND_ADD, rhs, lhs, pool);
+    return new_binary(ND_ADD, lhs, rhs, pool);
 }
 
 static Node *new_sub(Node *lhs, Node *rhs, mpool_t *pool) {
-    return new_binary(ND_SUB, rhs, lhs, pool);
+    return new_binary(ND_SUB, lhs, rhs, pool);
 }
 
 static Node *new_mul(Node *lhs, Node *rhs, mpool_t *pool) {
-    return new_binary(ND_MUL, rhs, lhs, pool);
+    return new_binary(ND_MUL, lhs, rhs, pool);
 }
 
 static Node *new_div(Node *lhs, Node *rhs, mpool_t *pool) {
-    return new_binary(ND_DIV, rhs, lhs, pool);
+    return new_binary(ND_DIV, lhs, rhs, pool);
 }
 
 //primary is the highest priority
