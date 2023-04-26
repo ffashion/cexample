@@ -10,15 +10,18 @@
 typedef struct ast_node_s Node;
 
 typedef enum {
-    ND_ADD,       // +
-    ND_SUB,       // -
+    ND_NUM,
     ND_MUL,       // *
     ND_DIV,       // /
+    ND_ADD,       // +
+    ND_SUB,       // -
+    ND_BITAND,    // &
+    ND_BITXOR,    // ^
+    ND_BITOR,     // |
+    ND_LOGAND,    // &&
+    ND_LOGOR,     // ||
+    ND_COMMA,     // ,
     ND_COND,      // ?:
-    ND_LOGOR,
-    ND_LOGAND,
-    ND_NUM,
-    ND_COMMA
 }NodeKind;
 
 struct ast_node_s {

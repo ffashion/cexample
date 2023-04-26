@@ -246,13 +246,65 @@ static Node *add(Token **rest, Token *tok, mpool_t *pool) {
     }
 }
 
-static Node *logand(Token **rest, Token *tok, mpool_t *pool) {
+static Node *bitand(Token **rest, Token *tok, mpool_t *pool) {
     Node *node, *rnode;
     node = add(&tok, tok, pool);
 
+
+    for (;;) {
+        if (equal(tok, "&")) {
+            rnode = add(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_BITAND, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+static Node *bitxor(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = bitand(&tok, tok, pool);
+
+
+    for (;;) {
+        if (equal(tok, "^")) {
+            rnode = bitand(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_BITXOR, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+
+static Node *bitor(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = bitxor(&tok, tok, pool);
+
+
+    for (;;) {
+        if (equal(tok, "|")) {
+            rnode = bitxor(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_BITOR, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+static Node *logand(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = bitor(&tok, tok, pool);
+
     for (;;) {
         if (equal(tok, "&&")) {
-            rnode = add(&tok, list_next_entry(tok, list), pool);
+            rnode = bitor(&tok, list_next_entry(tok, list), pool);
 
             node = new_binary(ND_LOGAND, node, rnode, pool);
         }
@@ -288,7 +340,7 @@ static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
 
         return new_binary(ND_COMMA, node, rnode, pool);
     }
-    
+
     *rest = tok;
     return node;
 }
@@ -306,12 +358,8 @@ Node* parser(Token *tok, mpool_t *pool) {
 
 int compute(Node *node) {
 
-    if (node->kind == ND_ADD) {
-        return compute(node->lhs) + compute(node->rhs);
-    }
-
-    if (node->kind == ND_SUB) {
-        return compute(node->lhs) - compute(node->rhs);
+    if (node->kind == ND_NUM) {
+        return node->val;
     }
 
     if (node->kind == ND_MUL) {
@@ -322,6 +370,27 @@ int compute(Node *node) {
         return compute(node->lhs) / compute(node->rhs);
     }
 
+
+    if (node->kind == ND_ADD) {
+        return compute(node->lhs) + compute(node->rhs);
+    }
+
+    if (node->kind == ND_SUB) {
+        return compute(node->lhs) - compute(node->rhs);
+    }
+
+    if (node->kind == ND_BITAND) {
+        return compute(node->lhs) & compute(node->rhs);
+    }
+
+    if (node->kind == ND_BITXOR) {
+        return compute(node->lhs) ^ compute(node->rhs);
+    }
+
+    if (node->kind == ND_BITOR) {
+        return compute(node->lhs) | compute(node->rhs);
+    }
+
     if (node->kind == ND_LOGAND) {
         return compute(node->lhs) && compute(node->rhs);
     }
@@ -330,14 +399,10 @@ int compute(Node *node) {
         return compute(node->lhs) || compute(node->rhs);
     }
 
-
     if (node->kind == ND_COMMA) {
         return compute(node->rhs);
     }
 
-    if (node->kind == ND_NUM) {
-        return node->val;
-    }
 
     return 0;
 }
