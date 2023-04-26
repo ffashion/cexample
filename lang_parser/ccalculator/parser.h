@@ -38,6 +38,9 @@ struct ast_node_s {
     NodeKind kind;
     Node *lhs;
     Node *rhs;
+    Node *cond;
+    Node *then;
+    Node *els;
     long val;
 };
 

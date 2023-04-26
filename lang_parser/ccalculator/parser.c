@@ -37,7 +37,7 @@ stmt  = ...| ident ":" stmt｜  "{" compound-stmt | expr-stmt
 
 compound-stmt = (typedef | declaration | stmt)* "}"
 
-expr-stmt = expr? ";"
+expr_stmt = expr? ":"
 
 expr = assign ("," expr)?
 
@@ -451,9 +451,30 @@ static Node *logor(Token **rest, Token *tok, mpool_t *pool) {
     
 }
 
+static Node *conditional(Token **rest, Token *tok, mpool_t *pool) {
+    Node *cond, *node;
+    cond = logor(&tok, tok, pool);
+
+    if (!equal(tok, "?")) {
+        *rest = tok;
+        return cond;
+    }
+
+    node = new_node(ND_COND, pool);
+    
+    node->cond = cond;
+    node->then = expr(&tok, list_next_entry(tok, list), pool);
+
+    tok = skip(tok, ":");
+    node->els = conditional(rest, tok, pool);
+    
+    return node;
+
+}
+
 static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
     Node *node, *rnode;
-    node = logor(&tok, tok, pool);
+    node = conditional(&tok, tok, pool);
 
     if (equal(tok, ",")) {
         rnode = expr(rest, list_next_entry(tok, list), pool);
@@ -562,6 +583,12 @@ int compute(Node *node) {
         return compute(node->rhs);
     }
 
+    if (node->kind == ND_COND) {
+        if (compute(node->cond)) {
+            return compute(node->then);
+        }
+        return compute(node->els);
+    }
 
     return 0;
 }
