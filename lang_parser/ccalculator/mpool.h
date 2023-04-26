@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <memory.h>
 
 typedef struct mpool_pool_s            mpool_t;

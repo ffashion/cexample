@@ -13,7 +13,7 @@ typedef enum {
     ND_NUM,
     ND_NEG,       // unary -
     ND_NOT,       // unary !
-    ND_EQ,        // == 
+    ND_EQ,        // ==
     ND_NE,        // !=
     ND_LT,        // <
     ND_LE,        // <=
@@ -36,11 +36,17 @@ typedef enum {
 
 struct ast_node_s {
     NodeKind kind;
-    Node *lhs;
-    Node *rhs;
-    Node *cond;
-    Node *then;
-    Node *els;
+    union {
+        struct {
+            Node *lhs;
+            Node *rhs;
+        };
+        struct {
+            Node *cond;
+            Node *then;
+            Node *els;
+        };
+    };
     long val;
 };
 
