@@ -11,6 +11,9 @@ typedef struct ast_node_s Node;
 
 typedef enum {
     ND_NUM,
+    ND_NEG,       // unary -
+    ND_NOT,       // unary !
+    ND_BITNOT,     // unary ~
     ND_MUL,       // *
     ND_DIV,       // /
     ND_MOD,       // %

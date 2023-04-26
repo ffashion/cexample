@@ -159,6 +159,11 @@ static Node *new_num(int val, mpool_t *pool) {
     return node;
 }
 
+static Node *new_unary(NodeKind kind, Node *expr, mpool_t *pool) {
+    Node *node = new_node(kind, pool);
+    node->lhs = expr;
+    return node;
+}
 
 static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, mpool_t *pool) {
     Node *node = new_node(kind, pool);
@@ -206,22 +211,46 @@ static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     return NULL;
 }
 
+static Node *unary(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node;
+    if (equal(tok, "+")) {
+        return mul(rest, tok, pool);
+    }
+
+    if (equal(tok, "-")) {
+        node = mul(rest, list_next_entry(tok, list), pool);
+        return new_unary(ND_NEG, node, pool);
+    }
+
+    if (equal(tok, "!")) {
+        node = mul(rest, list_next_entry(tok, list), pool);
+        return new_unary(ND_NOT, node, pool);
+    }
+
+    if (equal(tok, "~")) {
+        node = mul(rest, list_next_entry(tok, list), pool);
+        return new_unary(ND_BITNOT, node, pool);
+    }
+    
+    return primary(rest, tok, pool);
+}
+
 static Node *mul(Token **rest, Token *tok, mpool_t *pool) {
-    Node *node = primary(&tok, tok, pool);
+    Node *node = unary(&tok, tok, pool);
 
     for (;;) {
         if (equal(tok, "*")) {
-            node = new_mul(node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_mul(node, unary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
         if (equal(tok, "/")) {
-            node = new_div(node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_div(node, unary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
         if (equal(tok, "%")) {
-            node = new_mod(node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            node = new_mod(node, unary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
@@ -369,6 +398,18 @@ int compute(Node *node) {
 
     if (node->kind == ND_NUM) {
         return node->val;
+    }
+
+    if (node->kind == ND_NEG) {
+        return -compute(node->lhs);
+    }
+
+    if (node->kind == ND_NOT) {
+        return !compute(node->lhs);
+    }
+
+    if (node->kind == ND_BITNOT) {
+        return ~compute(node->lhs);
     }
 
     if (node->kind == ND_MUL) {
