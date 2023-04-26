@@ -13,6 +13,12 @@ typedef enum {
     ND_NUM,
     ND_NEG,       // unary -
     ND_NOT,       // unary !
+    ND_EQ,        // == 
+    ND_NE,        // !=
+    ND_LT,        // <
+    ND_LE,        // <=
+    ND_SHL,       // <<
+    ND_SHR,       // >>
     ND_BITNOT,     // unary ~
     ND_MUL,       // *
     ND_DIV,       // /

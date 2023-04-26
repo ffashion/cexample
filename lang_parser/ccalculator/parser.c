@@ -284,14 +284,96 @@ static Node *add(Token **rest, Token *tok, mpool_t *pool) {
     }
 }
 
-static Node *bitand(Token **rest, Token *tok, mpool_t *pool) {
+static Node *shift(Token **rest, Token *tok, mpool_t *pool) {
     Node *node, *rnode;
     node = add(&tok, tok, pool);
+
+    for (;;) {
+
+        if (equal(tok, "<<")) {
+            rnode = add(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_SHL, node, rnode, pool);
+        }
+
+        if (equal(tok, ">>")) {
+            rnode = add(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_SHR, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+static Node *relational(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = shift(&tok, tok, pool);
+
+    for (;;) {
+
+        if (equal(tok, "<")) {
+            rnode = shift(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LT, node, rnode, pool);
+        }
+
+        if (equal(tok, "<=")) {
+            rnode = shift(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LE, node, rnode, pool);
+        }
+
+        if (equal(tok, ">")) {
+            rnode = shift(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LT, rnode, node, pool);
+        }
+
+        if (equal(tok, ">=")) {
+            rnode = shift(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_LE, rnode, node, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+static Node *equality(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = relational(&tok, tok, pool);
+
+    for (;;) {
+
+        if (equal(tok, "==")) {
+            rnode = relational(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_EQ, node, rnode, pool);
+        }
+
+        if (equal(tok, "!=")) {
+            rnode = relational(&tok, list_next_entry(tok, list), pool);
+
+            node = new_binary(ND_NE, node, rnode, pool);
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+
+static Node *bitand(Token **rest, Token *tok, mpool_t *pool) {
+    Node *node, *rnode;
+    node = equality(&tok, tok, pool);
 
 
     for (;;) {
         if (equal(tok, "&")) {
-            rnode = add(&tok, list_next_entry(tok, list), pool);
+            rnode = equality(&tok, list_next_entry(tok, list), pool);
 
             node = new_binary(ND_BITAND, node, rnode, pool);
         }
@@ -410,6 +492,30 @@ int compute(Node *node) {
 
     if (node->kind == ND_BITNOT) {
         return ~compute(node->lhs);
+    }
+
+    if (node->kind == ND_EQ) {
+        return compute(node->lhs) == compute(node->rhs);
+    }
+
+    if (node->kind == ND_NE) {
+        return compute(node->lhs) != compute(node->rhs);
+    }
+
+    if (node->kind == ND_LE) {
+        return compute(node->lhs) <= compute(node->rhs);
+    }
+
+    if (node->kind == ND_LT) {
+        return compute(node->lhs) < compute(node->rhs);
+    }
+
+    if (node->kind == ND_SHL) {
+        return compute(node->lhs) << compute(node->rhs);
+    }
+
+    if (node->kind == ND_SHR) {
+        return compute(node->lhs) >> compute(node->rhs);
     }
 
     if (node->kind == ND_MUL) {
