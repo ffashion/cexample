@@ -280,14 +280,26 @@ static Node *logor(Token **rest, Token *tok, mpool_t *pool) {
 }
 
 static Node *expr(Token **rest, Token *tok, mpool_t *pool) {
-    return logor(rest, tok, pool);
+    Node *node, *rnode;
+    node = logor(&tok, tok, pool);
+
+    if (equal(tok, ",")) {
+        rnode = expr(rest, list_next_entry(tok, list), pool);
+
+        return new_binary(ND_COMMA, node, rnode, pool);
+    }
+    
+    *rest = tok;
+    return node;
 }
 
 
 Node* parser(Token *tok, mpool_t *pool) {
+    Node *node;
+    node =  expr(&tok, tok, pool);
+    assert(tok->kind == TK_EOF);
 
-    return expr(&tok, tok, pool);
-    
+    return node;
     // return NULL;
 }
 
@@ -316,6 +328,11 @@ int compute(Node *node) {
 
     if (node->kind == ND_LOGOR) {
         return compute(node->lhs) || compute(node->rhs);
+    }
+
+
+    if (node->kind == ND_COMMA) {
+        return compute(node->rhs);
     }
 
     if (node->kind == ND_NUM) {

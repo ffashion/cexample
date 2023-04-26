@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "token.h"
+#include <assert.h>
 typedef struct ast_node_s Node;
 
 typedef enum {
@@ -17,6 +18,7 @@ typedef enum {
     ND_LOGOR,
     ND_LOGAND,
     ND_NUM,
+    ND_COMMA
 }NodeKind;
 
 struct ast_node_s {
