@@ -183,6 +183,10 @@ static Node *new_div(Node *lhs, Node *rhs, mpool_t *pool) {
     return new_binary(ND_DIV, lhs, rhs, pool);
 }
 
+static Node *new_mod(Node *lhs, Node *rhs, mpool_t *pool) {
+    return new_binary(ND_MOD, lhs, rhs, pool);
+}
+
 //primary is the highest priority
 static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     if (equal(tok, "(")) {
@@ -213,6 +217,11 @@ static Node *mul(Token **rest, Token *tok, mpool_t *pool) {
 
         if (equal(tok, "/")) {
             node = new_div(node, primary(&tok, list_next_entry(tok, list), pool), pool);
+            continue;
+        }
+
+        if (equal(tok, "%")) {
+            node = new_mod(node, primary(&tok, list_next_entry(tok, list), pool), pool);
             continue;
         }
 
@@ -370,6 +379,9 @@ int compute(Node *node) {
         return compute(node->lhs) / compute(node->rhs);
     }
 
+    if (node->kind == ND_MOD) {
+        return compute(node->lhs) % compute(node->rhs);
+    }
 
     if (node->kind == ND_ADD) {
         return compute(node->lhs) + compute(node->rhs);
