@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <time.h>
 int get_ips_by_domain(const char * const domain){
     struct hostent *_hostent = NULL;
     _hostent =  gethostbyname(domain);
@@ -26,5 +27,8 @@ int get_ips_by_domain(const char * const domain){
 int main(int argc, char const *argv[])
 {
     get_ips_by_domain("baidu.com");
+    for (;;) {
+        // sleep(10);
+    }
     return 0;
 }

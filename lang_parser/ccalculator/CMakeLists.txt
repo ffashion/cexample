@@ -1,10 +1,11 @@
-
+project(ccalculator)
 
 set(HEADERS
     list.h
     token.h
     parser.h
     mpool.h
+    type.h
 )
 
 set(SRCS
@@ -12,6 +13,7 @@ set(SRCS
     token.c
     calculator.c
     mpool.c
+    type.c
     ${HEADERS}
 )
 

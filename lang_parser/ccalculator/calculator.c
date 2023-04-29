@@ -37,7 +37,7 @@ int	main(int argc, char **argv) {
         return -1;
     }
 
-    printf("%d\n", compute(node));
+    printf("%lld\n", compute(node));
 
     mpool_destroy(pool);
 

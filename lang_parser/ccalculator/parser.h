@@ -2,10 +2,12 @@
 #define __PARSER__H__
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include "token.h"
+#include "type.h"
 #include <assert.h>
 typedef struct ast_node_s Node;
 
@@ -47,11 +49,18 @@ struct ast_node_s {
             Node *els;
         };
     };
-    long val;
+
+    /*No use now*/
+    Type *ty;
+
+    int64_t val;
+    long double fval;
 };
 
 Node* parser(Token *tok, mpool_t *pool);
 
-int compute(Node *node);
+int64_t compute(Node *node);
+
+void error_log(char *fmt, ...);
 
 #endif  /*__PARSER__H__*/

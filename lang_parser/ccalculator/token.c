@@ -1,13 +1,15 @@
 #include "token.h"
 #include "list.h"
 #include "mpool.h"
+#include "parser.h"
+#include "type.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
 
-static bool startswith(char *p, char *q) {
+static bool startswith(const char *p, char *q) {
   return strncmp(p, q, strlen(q)) == 0;
 }
 
@@ -50,7 +52,147 @@ char *token_read_file(char *path) {
     return buf;
 }
 
-Token *new_token(tokentype_t type, char *start, char *end, mpool_t *pool) {
+typedef struct {
+    string_t name;
+    bool l;
+    bool u;
+}lu_t;
+
+static bool convert_int(Token *tok) {
+    const char *p;
+    int base = 10;
+    int64_t val;
+    bool l = false, u = false;
+    size_t i;
+    Type *ty;
+
+
+    p = tok->loc;
+
+    if (strncasecmp(p, "0b", 2) == 0) {
+        p += 2;
+        base = 16;
+    }else if (strncasecmp(p, "0b", 2) == 0) {
+        p += 2;
+        base = 2;
+    }else if (*p == '0') {
+        p += 1;
+        base = 8;
+    }
+
+    val = strtoul(p, (char **)&p, base);
+
+
+    lu_t lus[] = {
+        { .name = string("LLU"), .l = true, .u = true },
+        { string("LLu"), true, true },
+        { string("llU"), true, true },
+        { string("llu"), true, true },
+        { string("ULL"), true, true },
+        { string("Ull"), true, true },
+        { string("ull"), true, true },
+        { string("uLL"), true, true },
+        { string("lu"), true, true },
+        { string("ul"), true, true },
+        { string("L"), true, false },
+        { string("l"), true, false },
+        { string("U"), false, true },
+        { string("u"), false, true }
+    };
+
+    for (i = 0; i < ARRAY_SIZE(lus); i++) {
+        if (startswith(p, lus[i].name.data)) {
+            p += lus[i].name.len;
+            l = lus[i].l;
+            u = lus[i].u;
+            break;
+        }
+    }
+    
+    if (p != tok->end) {
+        //may be is a float or a illigal number
+        return false;
+    }
+
+    if (base == 10) {
+      if (l && u) {
+        ty = ty_ulong;
+      } else if (l) {
+        ty = ty_long;
+      } else if (u) {
+        ty = (val >> 32) ? ty_ulong : ty_uint;
+      }
+      else {
+        ty = (val >> 31) ? ty_long : ty_int;
+      }
+
+    } else {
+      if (l && u) {
+        ty = ty_ulong;
+      }
+
+      else if (l) {
+        ty = (val >> 63) ? ty_ulong : ty_long;
+      }
+      
+      else if (u) {
+        ty = (val >> 32) ? ty_ulong : ty_uint;
+      }
+
+      else if (val >> 63) {
+        ty = ty_ulong;
+      }
+
+      else if (val >> 32) {
+        ty = ty_long;
+      }
+
+      else if (val >> 31) {
+        ty = ty_uint;
+      }
+      else {
+        ty = ty_int;
+      }
+    }
+
+    assert(tok->kind == TK_NUM);
+    tok->val = val;
+    tok->ty = ty;
+
+    return true;
+}
+
+static bool convert_number(Token *tok) {
+    long double val;
+    char *end;
+    Type *ty;
+    if (convert_int(tok)) {
+        return true;
+    }
+
+    val = strtold(tok->loc, &end);
+
+    ty = ty_ldouble;
+
+    if (end[0] == 'f' || end[0] == 'F') {
+        ty = ty_float;
+        end++;
+    }else if (end[0] == 'l' || end[0] == 'L') {
+        ty = ty_ldouble;
+        end++;
+    }
+
+    if (end != tok->end) {
+        error_log("invalid numeric constant");
+    }
+
+    assert(tok->kind == TK_NUM);
+    tok->fval = val;
+    tok->ty = ty;
+    return true;
+}
+
+Token *new_token(TokenKind type, char *start, char *end, mpool_t *pool) {
     Token *t;
     t = mpool_calloc(pool, sizeof(Token));
     if (t == NULL) {
@@ -70,9 +212,10 @@ Token *new_token_num(char *start, char *end, mpool_t *pool) {
     if (t == NULL) {
         return NULL;
     }
-    //now we assume is int number
 
-    t->val = atoi(start);
+    if (!convert_number(t)) {
+        return NULL;
+    }
 
     return t;
 }

@@ -121,8 +121,16 @@ conditional (assign-op assign) ==> primary assign-op primary
 // }
 
 
+/**
+    // declaration specifier
+    declspec = "char" | "short" | "int" | "long" | struct-decl | union-decl
 
-static void error_log(char *fmt, ...) {
+    declarator = "*"* ident type-suffix
+    
+    declaration = declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+*/
+
+void error_log(char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
@@ -153,9 +161,10 @@ static Node *new_node(NodeKind kind, mpool_t *pool) {
     return node;
 }
 
-static Node *new_num(int val, mpool_t *pool) {
+static Node *new_num(int val, long double fval, mpool_t *pool) {
     Node *node = new_node(ND_NUM, pool);
     node->val = val;
+    node->fval = fval;
     return node;
 }
 
@@ -201,7 +210,7 @@ static Node *primary(Token **rest, Token *tok, mpool_t *pool) {
     }
 
     if (tok->kind == TK_NUM) {
-        Node *node = new_num(tok->val, pool);
+        Node *node = new_num(tok->val, tok->fval, pool);
 
         *rest = list_next_entry(tok, list);
         return node;
@@ -496,11 +505,13 @@ Node* parser(Token *tok, mpool_t *pool) {
     // return NULL;
 }
 
-
-int compute(Node *node) {
+int64_t compute(Node *node) {
 
     if (node->kind == ND_NUM) {
-        return node->val;
+        if (node->val) {
+            return node->val;
+        }
+        return node->fval;
     }
 
     if (node->kind == ND_NEG) {
