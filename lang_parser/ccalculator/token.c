@@ -69,7 +69,7 @@ static bool convert_int(Token *tok) {
 
     p = tok->loc;
 
-    if (strncasecmp(p, "0b", 2) == 0) {
+    if (strncasecmp(p, "0x", 2) == 0) {
         p += 2;
         base = 16;
     }else if (strncasecmp(p, "0b", 2) == 0) {
