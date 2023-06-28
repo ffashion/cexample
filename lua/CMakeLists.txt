@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(test_lua LANGUAGES C)
 
-add_executable(main main.c)
+add_executable(main main.c api.c)
 
 add_subdirectory(LuaJIT)
 

@@ -5,7 +5,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
-
+#include "config.h"
+#include "api.h"
 #define CEXAMPLE_OK 0
 #define CEXAMPLE_ERR -1
 
@@ -38,11 +39,21 @@ int ce_lua_panic_handler(lua_State *L) {
         len = sizeof("unknown reason") - 1;
     }
 
-    fprintf(stderr, "lua pani: Lua VM crashed %*s", (int)len , s);
+    fprintf(stderr, "lua panic: Lua VM crashed %*s", (int)len , s);
     return 0;
 #endif
 }
 
+int ce_register_module(lua_State *L, const char *module_name, const luaL_Reg *l) {
+    //just in lua5.1
+    luaL_register(L, module_name, l);
+    return CEXAMPLE_OK;
+}
+
+int ce_register_function(lua_State *L, const char *fun_name, lua_CFunction fun) {
+    lua_register(L, fun_name, fun);
+    return CEXAMPLE_OK;
+}
 
 static const char *
 ce_lua_clfactory_get_file(lua_State *L, void *ud, size_t *size) {
@@ -92,7 +103,18 @@ int ce_init_lua_vm(lua_State **vm) {
     }
 
     lua_atpanic(L, ce_lua_panic_handler);
-    
+
+#if HAVE_LUAJIT
+    luaopen_ffi(L);
+#endif
+
+    if (ce_register_module(L, "api_module", api_module) != CEXAMPLE_OK) {
+        return CEXAMPLE_ERR;
+    }
+
+    if (ce_register_function(L, "add", add) != CEXAMPLE_OK) {
+        return CEXAMPLE_ERR;
+    }
     *vm = L;
     return CEXAMPLE_OK;
 }
@@ -117,7 +139,7 @@ int ce_load_lua_script(lua_State *vm, const char *filename) {
 
 int ce_call_lua_code(lua_State *vm) {
     assert(lua_isfunction(vm, -1));
-
+    
     if (lua_resume(vm, 0) != LUA_OK) {
         return CEXAMPLE_ERR;
     }
@@ -141,7 +163,7 @@ int ce_read_lua_result(lua_State *vm) {
 
 
 int	main(int argc, char **argv) {
-    lua_State                       *L;
+    lua_State   *L;
 
     if (ce_init_lua_vm(&L) != CEXAMPLE_OK) {
         return CEXAMPLE_ERR;
