@@ -1,0 +1,3 @@
+[submodule "lua/LuaJIT"]
+	path = lua/LuaJIT
+	url = https://github.com/openbfdev/LuaJIT.git
