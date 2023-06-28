@@ -1,10 +1,67 @@
+#include <assert.h>
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <stddef.h>
+#include <stdio.h>
 
 
 #define CEXAMPLE_OK 0
 #define CEXAMPLE_ERR -1
+
+enum {
+    CE_LUA_READER_BUFSIZE = 4096,
+};
+
+
+typedef struct {
+    FILE       *f;
+    char        buff[CE_LUA_READER_BUFSIZE];
+
+} ce_lua_clfactory_file_ctx_t;
+
+int ce_lua_panic_handler(lua_State *L) {
+
+#ifdef CE_LUA_ABORT_AT_PANIC
+    abort();
+#else
+
+    const char                  *s = NULL;
+    size_t                len = 0;
+
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        s = lua_tolstring(L, -1, &len);
+    }
+
+    if (s == NULL) {
+        s = "unknown reason";
+        len = sizeof("unknown reason") - 1;
+    }
+
+    fprintf(stderr, "lua pani: Lua VM crashed %*s", (int)len , s);
+    return 0;
+#endif
+}
+
+
+static const char *
+ce_lua_clfactory_get_file(lua_State *L, void *ud, size_t *size) {
+    ce_lua_clfactory_file_ctx_t *lf;
+    size_t n;
+
+    lf = (ce_lua_clfactory_file_ctx_t *)ud;
+
+    n = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
+
+    if (n == 0) {
+        *size = 0;
+        return NULL;
+    }
+
+    *size = n;
+    return lf->buff;
+}
+
 
 lua_State *ce_new_lua_stat() {
     lua_State *L;
@@ -26,7 +83,7 @@ lua_State *ce_new_lua_stat() {
     return L;
 }
 
-int ce_init_lua_vm(lua_State **new_vm) {
+int ce_init_lua_vm(lua_State **vm) {
     lua_State *L;
     L = ce_new_lua_stat();
 
@@ -34,16 +91,69 @@ int ce_init_lua_vm(lua_State **new_vm) {
         return CEXAMPLE_ERR;
     }
 
+    lua_atpanic(L, ce_lua_panic_handler);
+    
+    *vm = L;
+    return CEXAMPLE_OK;
+}
+
+int ce_load_lua_script(lua_State *vm, const char *filename) {
+    ce_lua_clfactory_file_ctx_t lf;
+    int rc;
+
+    lf.f = fopen(filename, "r");
+    if (lf.f == NULL) {
+        return CEXAMPLE_ERR;
+    }
+
+    rc = lua_load(vm, ce_lua_clfactory_get_file, &lf, "LuaCode");
+    fclose(lf.f);
+    if (rc != 0) {
+        return CEXAMPLE_ERR;
+    }
 
     return CEXAMPLE_OK;
 }
+
+int ce_call_lua_code(lua_State *vm) {
+    assert(lua_isfunction(vm, -1));
+
+    if (lua_resume(vm, 0) != LUA_OK) {
+        return CEXAMPLE_ERR;
+    }
+
+    return CEXAMPLE_OK;
+}
+
+
+int ce_read_lua_result(lua_State *vm) {
+    int age;
+    const char *name;
+    lua_getglobal(vm, "age");
+    age = lua_tointeger(vm, -1);
+
+    lua_getglobal(vm, "Name");
+    name = lua_tostring(vm, -1);
+    
+    printf("name %s age is %d\n", name, age);
+    return CEXAMPLE_OK;
+}
+
+
 int	main(int argc, char **argv) {
     lua_State                       *L;
-    
+
     if (ce_init_lua_vm(&L) != CEXAMPLE_OK) {
         return CEXAMPLE_ERR;
     }
 
+    if (ce_load_lua_script(L, "main.lua") != CEXAMPLE_OK) {
+        return CEXAMPLE_ERR;
+    }
 
-    return 0;
+    if (ce_call_lua_code(L) != CEXAMPLE_OK) {
+        return CEXAMPLE_ERR;
+    }
+
+    return ce_read_lua_result(L);
 }
