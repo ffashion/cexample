@@ -44,6 +44,17 @@ int ce_lua_panic_handler(lua_State *L) {
 #endif
 }
 
+int ce_report_lua_error(lua_State  *L) {
+    const char *err;
+    if ((err = luaL_checkstring(L, -1)) == NULL) {
+        return CEXAMPLE_ERR;
+    }
+
+    printf("lua error: %s\n", err);
+    return CEXAMPLE_OK;
+}
+
+
 int ce_register_module(lua_State *L, const char *module_name, const luaL_Reg *l) {
     //just in lua5.1
     luaL_register(L, module_name, l);
@@ -108,7 +119,7 @@ int ce_init_lua_vm(lua_State **vm) {
     luaopen_ffi(L);
 #endif
 
-    if (ce_register_module(L, "api_module", api_module) != CEXAMPLE_OK) {
+    if (ce_register_module(L, "cmodule", api_module) != CEXAMPLE_OK) {
         return CEXAMPLE_ERR;
     }
 
@@ -128,7 +139,7 @@ int ce_load_lua_script(lua_State *vm, const char *filename) {
         return CEXAMPLE_ERR;
     }
 
-    rc = lua_load(vm, ce_lua_clfactory_get_file, &lf, "LuaCode");
+    rc = lua_load(vm, ce_lua_clfactory_get_file, &lf, filename);
     fclose(lf.f);
     if (rc != 0) {
         return CEXAMPLE_ERR;
@@ -161,21 +172,32 @@ int ce_read_lua_result(lua_State *vm) {
     return CEXAMPLE_OK;
 }
 
-
-int	main(int argc, char **argv) {
+int ce_process_lua(const char *file) {
     lua_State   *L;
 
     if (ce_init_lua_vm(&L) != CEXAMPLE_OK) {
+        ce_report_lua_error(L);
         return CEXAMPLE_ERR;
     }
 
     if (ce_load_lua_script(L, "main.lua") != CEXAMPLE_OK) {
+        ce_report_lua_error(L);
         return CEXAMPLE_ERR;
     }
 
     if (ce_call_lua_code(L) != CEXAMPLE_OK) {
+        ce_report_lua_error(L);
         return CEXAMPLE_ERR;
     }
 
-    return ce_read_lua_result(L);
+    if (ce_read_lua_result(L) != CEXAMPLE_OK) {
+        ce_report_lua_error(L);
+        return CEXAMPLE_ERR;
+    }
+
+    return CEXAMPLE_OK;
+}
+
+int	main(int argc, char **argv) {
+    return ce_process_lua("main.lua");
 }
