@@ -5,6 +5,7 @@ local cm = require("cmodule")
 
 -- lua_module.lua 返回的结果交给luam 
 local luam = require("lua_module")
+require("lua_ffi")
 
 -- module 
 local age = 10

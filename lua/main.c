@@ -162,6 +162,7 @@ int ce_call_lua_code(lua_State *vm) {
 int ce_read_lua_result(lua_State *vm) {
     int age;
     const char *name;
+    //can't get this var. because age is local var.
     lua_getglobal(vm, "age");
     age = lua_tointeger(vm, -1);
 
