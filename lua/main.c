@@ -54,6 +54,26 @@ int ce_report_lua_error(lua_State  *L) {
     return CEXAMPLE_OK;
 }
 
+int ce_create_db(lua_State  *vm, const char *name) {
+    //create table
+    lua_createtable(vm, 0, 1024);
+
+    lua_pushboolean(vm, 0);
+    lua_setfield(vm, -2, "debug"); // -2 is this table
+
+    //cover prev bool
+    lua_pushcfunction(vm, add);
+    lua_setfield(vm, -2, "add");
+
+    //cover prev function
+    lua_pushinteger(vm, ce_lua_version);
+    lua_setfield(vm, -2, "version");
+
+    //set table's name
+    lua_setglobal(vm, name);
+    return CEXAMPLE_OK;
+}
+
 
 int ce_register_module(lua_State *L, const char *module_name, const luaL_Reg *l) {
     //just in lua5.1
@@ -126,6 +146,11 @@ int ce_init_lua_vm(lua_State **vm) {
     if (ce_register_function(L, "add", add) != CEXAMPLE_OK) {
         return CEXAMPLE_ERR;
     }
+
+    if (ce_create_db(L, "config") != CEXAMPLE_OK) {
+        return CEXAMPLE_ERR;
+    }
+    
     *vm = L;
     return CEXAMPLE_OK;
 }
