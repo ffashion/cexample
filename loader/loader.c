@@ -5,7 +5,7 @@ int main(int argc, char *argv[])
     const char *path;
     int pid;
 
-    pid = fork();
+    pid = vfork();
     if (pid < 0)
         return pid;
 
